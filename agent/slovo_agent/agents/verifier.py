@@ -4,26 +4,11 @@ Verifier Agent
 Validates outputs, detects inconsistencies or uncertainty, triggers self-correction.
 """
 
-from dataclasses import dataclass
-from typing import Optional
-
 import structlog
 
-from slovo_agent.agents.executor import ExecutionResult
+from slovo_agent.models import ExecutionResult, Verification
 
-logger = structlog.get_logger()
-
-
-@dataclass
-class Verification:
-    """Result of verifying execution output."""
-    
-    is_valid: bool
-    confidence: float
-    issues: list[str]
-    suggestions: list[str]
-    requires_correction: bool = False
-    correction_hint: Optional[str] = None
+logger = structlog.get_logger(__name__)
 
 
 class VerifierAgent:

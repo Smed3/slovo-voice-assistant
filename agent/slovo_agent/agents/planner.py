@@ -5,46 +5,17 @@ Determines if existing tools can satisfy intent, plans multi-step execution,
 and decides when tool discovery is required.
 """
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Optional
-
 import structlog
 
-from slovo_agent.agents.intent import Intent
+from slovo_agent.models import (
+    ExecutionPlan,
+    Intent,
+    PlanStep,
+    StepType,
+    ToolManifest,
+)
 
-logger = structlog.get_logger()
-
-
-class StepType(str, Enum):
-    """Types of execution steps."""
-    
-    LLM_RESPONSE = "llm_response"
-    TOOL_EXECUTION = "tool_execution"
-    TOOL_DISCOVERY = "tool_discovery"
-    MEMORY_RETRIEVAL = "memory_retrieval"
-    CLARIFICATION = "clarification"
-
-
-@dataclass
-class PlanStep:
-    """A single step in an execution plan."""
-    
-    type: StepType
-    description: str
-    tool_name: Optional[str] = None
-    tool_params: dict = field(default_factory=dict)
-    depends_on: list[int] = field(default_factory=list)
-
-
-@dataclass
-class ExecutionPlan:
-    """Complete execution plan for handling a user request."""
-    
-    intent: Intent
-    steps: list[PlanStep] = field(default_factory=list)
-    requires_approval: bool = False
-    estimated_complexity: str = "simple"
+logger = structlog.get_logger(__name__)
 
 
 class PlannerAgent:
@@ -60,7 +31,7 @@ class PlannerAgent:
     
     def __init__(self) -> None:
         # Track available tools
-        self.available_tools: dict[str, dict] = {}
+        self.available_tools: dict[str, ToolManifest] = {}
         logger.info("Planner agent initialized")
     
     async def create_plan(self, intent: Intent) -> ExecutionPlan:
@@ -108,7 +79,7 @@ class PlannerAgent:
             estimated_complexity="simple" if len(steps) <= 3 else "complex",
         )
     
-    def register_tool(self, name: str, manifest: dict) -> None:
+    def register_tool(self, name: str, manifest: ToolManifest) -> None:
         """Register an available tool."""
         self.available_tools[name] = manifest
         logger.info("Tool registered", tool_name=name)

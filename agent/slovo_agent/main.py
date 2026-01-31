@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from slovo_agent.api.routes import router as api_router
 from slovo_agent.config import settings
+from slovo_agent.models import HealthResponse
 
 # Configure structured logging
 structlog.configure(
@@ -33,7 +34,7 @@ structlog.configure(
     cache_logger_on_first_use=True,
 )
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
 
 # Track uptime
 _start_time: float = 0
@@ -78,18 +79,18 @@ app.add_middleware(
 )
 
 
-@app.get("/health")
-async def health_check() -> dict:
+@app.get("/health", response_model=HealthResponse)
+async def health_check() -> HealthResponse:
     """Health check endpoint."""
     global _start_time
     current_time = asyncio.get_event_loop().time()
     uptime = current_time - _start_time if _start_time > 0 else 0
     
-    return {
-        "status": "healthy",
-        "version": settings.version,
-        "uptime": uptime,
-    }
+    return HealthResponse(
+        status="healthy",
+        version=settings.version,
+        uptime=uptime,
+    )
 
 
 # Include API routes

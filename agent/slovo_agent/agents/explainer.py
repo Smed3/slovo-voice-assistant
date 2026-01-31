@@ -4,30 +4,16 @@ Explainer Agent
 Produces user-facing explanations, summarizes reasoning and actions.
 """
 
-from dataclasses import dataclass
-from typing import Optional
-
 import structlog
 
-from slovo_agent.agents.intent import Intent
-from slovo_agent.agents.executor import ExecutionResult
-from slovo_agent.agents.verifier import Verification
+from slovo_agent.models import (
+    ExecutionResult,
+    Explanation,
+    Intent,
+    Verification,
+)
 
-logger = structlog.get_logger()
-
-
-@dataclass
-class Explanation:
-    """User-facing explanation of agent actions."""
-    
-    response: str
-    reasoning: Optional[str] = None
-    actions_taken: list[str] = None
-    confidence_note: Optional[str] = None
-    
-    def __post_init__(self):
-        if self.actions_taken is None:
-            self.actions_taken = []
+logger = structlog.get_logger(__name__)
 
 
 class ExplainerAgent:
@@ -64,7 +50,7 @@ class ExplainerAgent:
                 response += f" The issue was: {result.error}"
         
         # Build reasoning summary
-        reasoning_parts = []
+        reasoning_parts: list[str] = []
         reasoning_parts.append(f"Understood intent: {intent.type.value}")
         reasoning_parts.append(f"Executed {len(result.step_results)} steps")
         

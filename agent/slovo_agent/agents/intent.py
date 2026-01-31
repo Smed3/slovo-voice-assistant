@@ -4,41 +4,11 @@ Intent Interpreter Agent
 Parses voice/text input, detects language(s), and normalizes intent.
 """
 
-from dataclasses import dataclass
-from enum import Enum
-from typing import Optional
-
 import structlog
 
-logger = structlog.get_logger()
+from slovo_agent.models import Intent, IntentType
 
-
-class IntentType(str, Enum):
-    """Types of user intents."""
-    
-    QUESTION = "question"
-    COMMAND = "command"
-    CONVERSATION = "conversation"
-    TOOL_REQUEST = "tool_request"
-    CLARIFICATION = "clarification"
-    UNKNOWN = "unknown"
-
-
-@dataclass
-class Intent:
-    """Parsed user intent."""
-    
-    type: IntentType
-    text: str
-    language: str = "en"
-    entities: dict = None
-    confidence: float = 1.0
-    requires_tool: bool = False
-    tool_hint: Optional[str] = None
-    
-    def __post_init__(self):
-        if self.entities is None:
-            self.entities = {}
+logger = structlog.get_logger(__name__)
 
 
 class IntentInterpreterAgent:

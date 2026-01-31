@@ -4,35 +4,19 @@ Executor Agent
 Executes approved tools in sandboxed environments, handles retries and partial failures.
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 
-from slovo_agent.agents.planner import ExecutionPlan, StepType
+from slovo_agent.models import (
+    ExecutionPlan,
+    ExecutionResult,
+    PlanStep,
+    StepResult,
+    StepType,
+)
 
-logger = structlog.get_logger()
-
-
-@dataclass
-class StepResult:
-    """Result of executing a single step."""
-    
-    step_index: int
-    success: bool
-    output: Any = None
-    error: Optional[str] = None
-
-
-@dataclass
-class ExecutionResult:
-    """Complete result of plan execution."""
-    
-    plan: ExecutionPlan
-    success: bool
-    step_results: list[StepResult] = field(default_factory=list)
-    final_output: Any = None
-    error: Optional[str] = None
+logger = structlog.get_logger(__name__)
 
 
 class ExecutorAgent:
@@ -101,7 +85,7 @@ class ExecutorAgent:
     
     async def _execute_step(
         self,
-        step,
+        step: PlanStep,
         index: int,
         context: dict[str, Any],
     ) -> StepResult:

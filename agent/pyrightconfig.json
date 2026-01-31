@@ -1,0 +1,18 @@
+{
+    "include": ["slovo_agent"],
+    "typeCheckingMode": "strict",
+    "pythonVersion": "3.11",
+    "reportMissingTypeStubs": false,
+    "reportUnknownMemberType": false,
+    "reportUnknownArgumentType": false,
+    "reportUnknownVariableType": false,
+    "reportUnknownParameterType": true,
+    "reportMissingParameterType": true,
+    "reportPrivateUsage": false,
+    "reportUnnecessaryIsInstance": false,
+    "reportUnnecessaryTypeIgnoreComment": false,
+    "reportIncompatibleMethodOverride": true,
+    "reportIncompatibleVariableOverride": true,
+    "venvPath": ".",
+    "venv": ".venv"
+}

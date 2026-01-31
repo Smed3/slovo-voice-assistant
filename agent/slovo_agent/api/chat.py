@@ -8,11 +8,15 @@ from typing import AsyncGenerator, Optional
 import structlog
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
 
 from slovo_agent.agents.orchestrator import AgentOrchestrator
+from slovo_agent.models import (
+    ChatRequest,
+    ChatResponse,
+    ConversationHistoryResponse,
+)
 
-logger = structlog.get_logger()
+logger = structlog.get_logger(__name__)
 router = APIRouter()
 
 # Global orchestrator instance (will be properly initialized in lifespan)
@@ -25,22 +29,6 @@ def get_orchestrator() -> AgentOrchestrator:
     if _orchestrator is None:
         _orchestrator = AgentOrchestrator()
     return _orchestrator
-
-
-class ChatRequest(BaseModel):
-    """Chat request model."""
-    
-    message: str = Field(..., min_length=1, max_length=10000)
-    conversation_id: Optional[str] = Field(default=None)
-
-
-class ChatResponse(BaseModel):
-    """Chat response model."""
-    
-    id: str
-    response: str
-    conversation_id: str
-    reasoning: Optional[str] = None
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -94,13 +82,6 @@ async def chat_stream(request: ChatRequest) -> StreamingResponse:
         generate(),
         media_type="text/event-stream",
     )
-
-
-class ConversationHistoryResponse(BaseModel):
-    """Conversation history response model."""
-    
-    conversation_id: str
-    messages: list[dict]
 
 
 @router.get("/conversation/{conversation_id}", response_model=ConversationHistoryResponse)

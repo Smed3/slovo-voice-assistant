@@ -2,27 +2,18 @@
 Agent orchestrator that coordinates all agent interactions.
 """
 
-from dataclasses import dataclass
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator
 
 import structlog
 
+from slovo_agent.agents.executor import ExecutorAgent
+from slovo_agent.agents.explainer import ExplainerAgent
 from slovo_agent.agents.intent import IntentInterpreterAgent
 from slovo_agent.agents.planner import PlannerAgent
-from slovo_agent.agents.executor import ExecutorAgent
 from slovo_agent.agents.verifier import VerifierAgent
-from slovo_agent.agents.explainer import ExplainerAgent
+from slovo_agent.models import AgentResult
 
-logger = structlog.get_logger()
-
-
-@dataclass
-class AgentResult:
-    """Result from agent processing."""
-    
-    response: str
-    reasoning: Optional[str] = None
-    confidence: float = 1.0
+logger = structlog.get_logger(__name__)
 
 
 class AgentOrchestrator:
