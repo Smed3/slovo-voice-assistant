@@ -14,7 +14,7 @@ use crate::error::SlovoError;
 /// Agent runtime configuration
 const AGENT_HOST: &str = "127.0.0.1";
 const AGENT_PORT: u16 = 8741;
-const HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(5);
+const HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(10);
 
 /// Agent health status
 #[derive(Debug, Clone, Serialize, Deserialize)]

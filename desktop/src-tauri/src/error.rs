@@ -19,15 +19,3 @@ pub enum SlovoError {
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 }
-
-impl std::fmt::Display for SlovoError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SlovoError::AgentConnection(msg) => write!(f, "Agent connection error: {}", msg),
-            SlovoError::AgentError(msg) => write!(f, "Agent error: {}", msg),
-            SlovoError::VoiceError(msg) => write!(f, "Voice processing error: {}", msg),
-            SlovoError::ConfigError(msg) => write!(f, "Configuration error: {}", msg),
-            SlovoError::IoError(e) => write!(f, "IO error: {}", e),
-        }
-    }
-}

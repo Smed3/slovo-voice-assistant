@@ -1,5 +1,4 @@
 {
-  "$schema": "https://raw.githubusercontent.com/nickel-org/nickel.rs/master/capabilities.schema.json",
   "identifier": "default",
   "description": "Default capabilities for the Slovo assistant",
   "windows": ["main"],
@@ -10,7 +9,7 @@
     "core:window:allow-close",
     "core:window:allow-set-focus",
     "core:window:allow-is-visible",
-    "tray:default",
+    "core:tray:default",
     "shell:allow-open",
     "notification:default",
     "process:allow-exit",
