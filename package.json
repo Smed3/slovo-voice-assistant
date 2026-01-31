@@ -1,0 +1,27 @@
+{
+  "name": "slovo-voice-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Desktop-native agentic voice assistant",
+  "scripts": {
+    "dev": "pnpm --filter desktop tauri dev",
+    "build": "pnpm --filter desktop tauri build",
+    "lint": "pnpm --filter desktop lint",
+    "test": "pnpm --filter desktop test",
+    "agent:dev": "cd agent && uv run uvicorn slovo_agent.main:app --reload --port 8741",
+    "agent:start": "cd agent && uv run uvicorn slovo_agent.main:app --port 8741"
+  },
+  "keywords": [
+    "voice-assistant",
+    "tauri",
+    "ai",
+    "agentic"
+  ],
+  "author": "",
+  "license": "MIT",
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}

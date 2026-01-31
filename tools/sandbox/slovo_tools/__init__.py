@@ -1,0 +1,3 @@
+"""
+Slovo Tools Package
+"""

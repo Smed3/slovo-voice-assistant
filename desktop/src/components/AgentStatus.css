@@ -1,0 +1,49 @@
+.agent-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: var(--bg-tertiary);
+  font-size: 0.85rem;
+  -webkit-app-region: no-drag;
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transition: background-color 0.3s ease;
+}
+
+.status-label {
+  color: var(--text-secondary);
+}
+
+/* Status variants */
+.status-disconnected .status-indicator {
+  background-color: var(--error);
+}
+
+.status-connecting .status-indicator {
+  background-color: var(--warning);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.status-connected .status-indicator {
+  background-color: var(--success);
+}
+
+.status-processing .status-indicator {
+  background-color: var(--accent-primary);
+  animation: pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}

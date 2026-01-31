@@ -1,0 +1,51 @@
+{
+  "name": "web-search",
+  "version": "1.0.0",
+  "description": "Search the web and return relevant results",
+  "author": "Slovo Team",
+  "license": "MIT",
+  "capabilities": [
+    "web-search",
+    "information-retrieval"
+  ],
+  "execution": {
+    "type": "docker",
+    "image": "slovo/tool-web-search:latest",
+    "entrypoint": "python /app/main.py",
+    "timeout": 30
+  },
+  "permissions": {
+    "network": {
+      "outbound": true,
+      "allowedHosts": [
+        "api.duckduckgo.com",
+        "www.google.com"
+      ]
+    },
+    "storage": {
+      "persistent": false
+    },
+    "resources": {
+      "maxMemoryMB": 256,
+      "maxCpuPercent": 25
+    }
+  },
+  "inputs": {
+    "query": {
+      "type": "string",
+      "description": "Search query",
+      "required": true
+    },
+    "maxResults": {
+      "type": "integer",
+      "description": "Maximum number of results",
+      "required": false
+    }
+  },
+  "outputs": {
+    "results": {
+      "type": "array",
+      "description": "Search results with title, url, and snippet"
+    }
+  }
+}

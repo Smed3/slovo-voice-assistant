@@ -1,0 +1,22 @@
+# Tauri Build Capabilities
+# This file defines the permissions required by the application
+
+[[permission]]
+identifier = "core:default"
+description = "Default Tauri capabilities"
+
+[[permission]]
+identifier = "tray:default"
+description = "System tray capabilities"
+
+[[permission]]
+identifier = "shell:allow-open"
+description = "Allow opening URLs"
+
+[[permission]]
+identifier = "notification:default"
+description = "Notification capabilities"
+
+[[permission]]
+identifier = "process:allow-exit"
+description = "Allow process exit"

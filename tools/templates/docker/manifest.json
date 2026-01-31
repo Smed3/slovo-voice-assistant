@@ -1,0 +1,41 @@
+{
+  "name": "template-tool",
+  "version": "1.0.0",
+  "description": "Template tool for Slovo Voice Assistant",
+  "author": "Your Name",
+  "license": "MIT",
+  "capabilities": [
+    "example-capability"
+  ],
+  "execution": {
+    "type": "docker",
+    "image": "slovo/tool-template:latest",
+    "entrypoint": "python /app/main.py",
+    "timeout": 30
+  },
+  "permissions": {
+    "network": {
+      "outbound": false
+    },
+    "storage": {
+      "persistent": false
+    },
+    "resources": {
+      "maxMemoryMB": 128,
+      "maxCpuPercent": 25
+    }
+  },
+  "inputs": {
+    "exampleInput": {
+      "type": "string",
+      "description": "An example input parameter",
+      "required": true
+    }
+  },
+  "outputs": {
+    "result": {
+      "type": "object",
+      "description": "The tool output"
+    }
+  }
+}

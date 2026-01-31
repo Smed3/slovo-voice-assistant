@@ -1,0 +1,140 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Slovo Tool Manifest",
+  "description": "Schema for Slovo Voice Assistant tool manifests",
+  "type": "object",
+  "required": [
+    "name",
+    "version",
+    "description",
+    "execution"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Unique identifier for the tool",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "version": {
+      "type": "string",
+      "description": "Semantic version of the tool",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of the tool"
+    },
+    "author": {
+      "type": "string",
+      "description": "Tool author or organization"
+    },
+    "license": {
+      "type": "string",
+      "description": "License identifier"
+    },
+    "capabilities": {
+      "type": "array",
+      "description": "List of capabilities this tool provides",
+      "items": {
+        "type": "string"
+      }
+    },
+    "execution": {
+      "type": "object",
+      "description": "Execution configuration",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["docker", "wasm"],
+          "description": "Execution environment type"
+        },
+        "image": {
+          "type": "string",
+          "description": "Docker image name (for docker type)"
+        },
+        "module": {
+          "type": "string",
+          "description": "WASM module path (for wasm type)"
+        },
+        "entrypoint": {
+          "type": "string",
+          "description": "Entrypoint command or function"
+        },
+        "timeout": {
+          "type": "integer",
+          "description": "Maximum execution time in seconds",
+          "default": 30
+        }
+      }
+    },
+    "permissions": {
+      "type": "object",
+      "description": "Required permissions",
+      "properties": {
+        "network": {
+          "type": "object",
+          "properties": {
+            "outbound": {
+              "type": "boolean",
+              "default": false
+            },
+            "allowedHosts": {
+              "type": "array",
+              "items": {"type": "string"}
+            }
+          }
+        },
+        "storage": {
+          "type": "object",
+          "properties": {
+            "persistent": {
+              "type": "boolean",
+              "default": false
+            },
+            "maxSizeMB": {
+              "type": "integer",
+              "default": 100
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "maxMemoryMB": {
+              "type": "integer",
+              "default": 256
+            },
+            "maxCpuPercent": {
+              "type": "integer",
+              "default": 50
+            }
+          }
+        }
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "description": "Input schema for the tool",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "type": {"type": "string"},
+          "description": {"type": "string"},
+          "required": {"type": "boolean"}
+        }
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "description": "Output schema for the tool",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "type": {"type": "string"},
+          "description": {"type": "string"}
+        }
+      }
+    }
+  }
+}
