@@ -32,6 +32,31 @@ from slovo_agent.models.base import (
     ToolManifest,
 )
 
+from slovo_agent.models.reasoning import (
+    # Uncertainty & Clarification
+    UncertaintyLevel,
+    ClarificationReason,
+    ClarificationRequest,
+    # Intent Analysis
+    DetectedLanguage,
+    ExtractedEntity,
+    IntentAnalysis,
+    # Planning
+    PlannedAction,
+    RiskAssessment,
+    ExecutionPlanAnalysis,
+    # Verification
+    VerificationIssue,
+    VerificationAnalysis,
+    # Response Generation
+    ResponseTone,
+    ExplanationDetail,
+    ResponseGeneration,
+    # Context
+    ConversationContext,
+    AgentState,
+)
+
 __all__ = [
     # Intent models
     "IntentType",
@@ -57,4 +82,26 @@ __all__ = [
     "ConversationHistoryResponse",
     # Tool models
     "ToolManifest",
+    # Reasoning models - Uncertainty & Clarification
+    "UncertaintyLevel",
+    "ClarificationReason",
+    "ClarificationRequest",
+    # Reasoning models - Intent Analysis
+    "DetectedLanguage",
+    "ExtractedEntity",
+    "IntentAnalysis",
+    # Reasoning models - Planning
+    "PlannedAction",
+    "RiskAssessment",
+    "ExecutionPlanAnalysis",
+    # Reasoning models - Verification
+    "VerificationIssue",
+    "VerificationAnalysis",
+    # Reasoning models - Response Generation
+    "ResponseTone",
+    "ExplanationDetail",
+    "ResponseGeneration",
+    # Reasoning models - Context
+    "ConversationContext",
+    "AgentState",
 ]
