@@ -202,7 +202,7 @@ Entities: {intent.entities}
             or analysis.risk.level in ["high", "critical"]
             or any(step.type == StepType.TOOL_EXECUTION for step in steps)
         )
-        
+
         requires_explanation = (
             analysis.complexity in ["complex", "very_complex"]
             or len(steps) > 2

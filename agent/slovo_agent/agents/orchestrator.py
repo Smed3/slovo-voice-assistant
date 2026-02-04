@@ -6,7 +6,8 @@ supports clarification requests for uncertain situations.
 """
 
 import asyncio
-from typing import TYPE_CHECKING, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import TYPE_CHECKING
 
 import structlog
 
@@ -29,6 +30,7 @@ from slovo_agent.models import (
     MemoryWriteRequest,
     PlanStep,
     StepType,
+    Verification,
     VerifierMemoryApproval,
 )
 
@@ -65,7 +67,7 @@ class AgentOrchestrator:
         self._init_llm_provider()
 
         # Memory manager (optional, enables long-term memory)
-        self._memory: "MemoryManager | None" = memory_manager
+        self._memory: MemoryManager | None = memory_manager
 
         # Initialize agents with LLM provider
         self.intent_agent = IntentInterpreterAgent(self.llm)
@@ -208,7 +210,7 @@ class AgentOrchestrator:
             # Skip planner, verifier, and explainer for conversational intents
             if self._is_simple_intent(intent):
                 logger.info("Fast path: simple intent detected", intent_type=intent.type.value)
-                
+
                 # Create a minimal plan with just LLM response
                 plan = ExecutionPlan(
                     intent=intent,
@@ -233,7 +235,7 @@ class AgentOrchestrator:
 
                 # Extract response directly from execution result
                 response = execution_result.final_output or "I'm here to help!"
-                
+
                 # Update conversation context
                 self._update_conversation_context(context, message, response)
 
@@ -363,27 +365,27 @@ class AgentOrchestrator:
     def _is_simple_intent(self, intent) -> bool:
         """
         Check if an intent is simple and can use the fast path.
-        
+
         Simple intents include greetings, farewells, and basic conversation
         that don't require tool execution or complex reasoning.
         """
         # Conversational intents are typically simple
         if intent.type == IntentType.CONVERSATION:
             return True
-        
+
         # Questions that don't require tools are simple
         if intent.type == IntentType.QUESTION and not intent.requires_tool:
             # Check for greeting patterns
             message_lower = intent.text.lower()
             greeting_patterns = [
-                "hello", "hi", "hey", "greetings", "good morning", 
+                "hello", "hi", "hey", "greetings", "good morning",
                 "good afternoon", "good evening", "howdy",
                 "goodbye", "bye", "see you", "farewell",
                 "thanks", "thank you", "thx",
             ]
             if any(pattern in message_lower for pattern in greeting_patterns):
                 return True
-        
+
         return False
 
     async def _attempt_correction(
@@ -543,7 +545,7 @@ class AgentOrchestrator:
         self,
         user_message: str,
         assistant_response: str,
-        verification: "VerificationResult",  # type: ignore
+        verification: Verification | None,
     ) -> None:
         """Extract memorable facts from conversation and store them."""
         if self._memory is None:

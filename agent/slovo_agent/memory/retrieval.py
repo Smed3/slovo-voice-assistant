@@ -15,6 +15,7 @@ Retrieval Order (Fixed):
 """
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from typing import Final
 
 import structlog
@@ -32,6 +33,9 @@ from slovo_agent.models import (
 )
 
 logger = structlog.get_logger(__name__)
+
+# Type alias for embedding function
+EmbeddingFunction = Callable[[str], Awaitable[list[float]]]
 
 # Token estimation (rough approximation: ~4 chars per token)
 CHARS_PER_TOKEN: Final[int] = 4
@@ -397,9 +401,3 @@ class MemoryRetrievalPipeline:
         if len(text) <= max_chars:
             return text
         return text[: max_chars - 3] + "..."
-
-
-# Type alias for embedding function
-from typing import Awaitable, Callable
-
-EmbeddingFunction = Callable[[str], Awaitable[list[float]]]
