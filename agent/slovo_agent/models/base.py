@@ -69,6 +69,8 @@ class ExecutionPlan(BaseModel):
     steps: list["PlanStep"] = []
     requires_approval: bool = False
     estimated_complexity: str = "simple"
+    requires_verification: bool = True
+    requires_explanation: bool = True
 
 
 # =============================================================================

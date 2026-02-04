@@ -14,6 +14,7 @@ Retrieval Order (Fixed):
 4. Episodic Summaries (Postgres)
 """
 
+import asyncio
 from typing import Final
 
 import structlog
@@ -107,36 +108,30 @@ class MemoryRetrievalPipeline:
         remaining_tokens = request.token_limit
         total_tokens = 0
 
-        # 1. User Profile (Postgres)
-        profile_summary, profile_tokens = await self._retrieve_profile(
-            min(PROFILE_TOKEN_BUDGET, remaining_tokens)
+        # Parallelize all 4 memory retrievals using asyncio.gather
+        (
+            (profile_summary, profile_tokens),
+            (conversation_summary, conv_tokens),
+            (semantic_summary, semantic_tokens),
+            (episodic_summary, episodic_tokens),
+        ) = await asyncio.gather(
+            self._retrieve_profile(min(PROFILE_TOKEN_BUDGET, remaining_tokens)),
+            self._retrieve_session(
+                request.conversation_id,
+                min(CONVERSATION_TOKEN_BUDGET, remaining_tokens),
+            ),
+            self._retrieve_semantic(
+                request.user_message,
+                request.max_semantic_results,
+                min(SEMANTIC_TOKEN_BUDGET, remaining_tokens),
+            ),
+            self._retrieve_episodic(
+                request.max_episodic_results,
+                min(EPISODIC_TOKEN_BUDGET, remaining_tokens),
+            ),
         )
-        remaining_tokens -= profile_tokens
-        total_tokens += profile_tokens
 
-        # 2. Recent Session Context (Redis)
-        conversation_summary, conv_tokens = await self._retrieve_session(
-            request.conversation_id,
-            min(CONVERSATION_TOKEN_BUDGET, remaining_tokens),
-        )
-        remaining_tokens -= conv_tokens
-        total_tokens += conv_tokens
-
-        # 3. Semantic Recall (Qdrant)
-        semantic_summary, semantic_tokens = await self._retrieve_semantic(
-            request.user_message,
-            request.max_semantic_results,
-            min(SEMANTIC_TOKEN_BUDGET, remaining_tokens),
-        )
-        remaining_tokens -= semantic_tokens
-        total_tokens += semantic_tokens
-
-        # 4. Episodic Summaries (Postgres)
-        episodic_summary, episodic_tokens = await self._retrieve_episodic(
-            request.max_episodic_results,
-            min(EPISODIC_TOKEN_BUDGET, remaining_tokens),
-        )
-        total_tokens += episodic_tokens
+        total_tokens = profile_tokens + conv_tokens + semantic_tokens + episodic_tokens
 
         context = MemoryContext(
             user_profile_summary=profile_summary,

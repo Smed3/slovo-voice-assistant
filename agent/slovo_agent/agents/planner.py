@@ -195,11 +195,27 @@ Entities: {intent.entities}
                 )
             )
 
+        # Determine if verification and explanation are needed
+        # based on complexity and risk
+        requires_verification = (
+            analysis.complexity in ["complex", "very_complex"]
+            or analysis.risk.level in ["high", "critical"]
+            or any(step.type == StepType.TOOL_EXECUTION for step in steps)
+        )
+        
+        requires_explanation = (
+            analysis.complexity in ["complex", "very_complex"]
+            or len(steps) > 2
+            or any(step.type in [StepType.TOOL_EXECUTION, StepType.TOOL_DISCOVERY] for step in steps)
+        )
+
         return ExecutionPlan(
             intent=intent,
             steps=steps,
             requires_approval=analysis.risk.requires_approval,
             estimated_complexity=analysis.complexity,
+            requires_verification=requires_verification,
+            requires_explanation=requires_explanation,
         )
 
     def _heuristic_plan(self, intent: Intent) -> ExecutionPlan:
@@ -246,11 +262,18 @@ Entities: {intent.entities}
             )
         )
 
+        # Determine complexity flags
+        complexity = "simple" if len(steps) <= 3 else "complex"
+        requires_verification = intent.requires_tool or len(steps) > 3
+        requires_explanation = intent.requires_tool or len(steps) > 2
+
         return ExecutionPlan(
             intent=intent,
             steps=steps,
             requires_approval=intent.requires_tool,
-            estimated_complexity="simple" if len(steps) <= 3 else "complex",
+            estimated_complexity=complexity,
+            requires_verification=requires_verification,
+            requires_explanation=requires_explanation,
         )
 
     def _build_tools_context(self) -> str:
