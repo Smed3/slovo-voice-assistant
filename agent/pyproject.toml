@@ -25,6 +25,8 @@ dependencies = [
     "asyncpg>=0.29.0",
     "python-dotenv>=1.0.0",
     "structlog>=24.1.0",
+    # Phase 3: Memory System
+    "cryptography>=42.0.0",
 ]
 
 [project.optional-dependencies]

@@ -5,7 +5,7 @@ Integrates with LLM providers for intelligent reasoning and
 supports clarification requests for uncertain situations.
 """
 
-from typing import AsyncGenerator
+from typing import TYPE_CHECKING, AsyncGenerator
 
 import structlog
 
@@ -21,7 +21,15 @@ from slovo_agent.models import (
     ClarificationRequest,
     ConversationContext,
     IntentType,
+    MemoryContext,
+    MemorySource,
+    MemoryType,
+    MemoryWriteRequest,
+    VerifierMemoryApproval,
 )
+
+if TYPE_CHECKING:
+    from slovo_agent.memory import MemoryManager
 
 logger = structlog.get_logger(__name__)
 
@@ -43,10 +51,17 @@ class AgentOrchestrator:
     - Conversation context tracking
     """
 
-    def __init__(self, llm_provider: LLMProvider | None = None) -> None:
+    def __init__(
+        self,
+        llm_provider: LLMProvider | None = None,
+        memory_manager: "MemoryManager | None" = None,
+    ) -> None:
         # Initialize LLM provider
         self.llm: LLMProvider | None = llm_provider
         self._init_llm_provider()
+
+        # Memory manager (optional, enables long-term memory)
+        self._memory: "MemoryManager | None" = memory_manager
 
         # Initialize agents with LLM provider
         self.intent_agent = IntentInterpreterAgent(self.llm)
@@ -65,7 +80,13 @@ class AgentOrchestrator:
         logger.info(
             "Agent orchestrator initialized",
             has_llm=self.llm is not None,
+            has_memory=self._memory is not None,
         )
+
+    def set_memory_manager(self, manager: "MemoryManager") -> None:
+        """Set memory manager for long-term memory support."""
+        self._memory = manager
+        logger.info("Memory manager set for orchestrator")
 
     def _init_llm_provider(self) -> None:
         """Initialize LLM provider if not provided."""
@@ -119,17 +140,52 @@ class AgentOrchestrator:
         # Get or create conversation context
         context = self._get_conversation_context(conversation_id)
 
+        # Retrieve memory context before processing
+        memory_context: MemoryContext | None = None
+        if self._memory is not None:
+            try:
+                memory_context = await self._memory.retrieve_context(
+                    user_message=message,
+                    conversation_id=conversation_id,
+                )
+                logger.debug(
+                    "Memory context retrieved",
+                    has_profile=bool(memory_context.user_profile_summary),
+                    has_semantic=bool(memory_context.relevant_memories_summary),
+                    has_conversation=bool(memory_context.recent_conversation_summary),
+                    total_tokens=memory_context.total_token_estimate,
+                )
+            except Exception as e:
+                logger.warning("Failed to retrieve memory context", error=str(e))
+
         try:
+            # Store the user message in short-term memory
+            if self._memory is not None:
+                try:
+                    await self._memory.store_turn(
+                        conversation_id=conversation_id,
+                        role="user",
+                        content=message,
+                    )
+                    logger.info("User turn stored in memory", conversation_id=conversation_id)
+                except Exception as e:
+                    logger.warning("Failed to store user turn", error=str(e))
+            else:
+                logger.warning("Memory manager not available - turns will not be persisted")
+
             # Check if this is a response to a pending clarification
             if conversation_id in self.pending_clarifications:
                 return await self._handle_clarification_response(
                     message, conversation_id, context
                 )
 
+            # Build context string with memory
+            context_string = self._build_context_string_with_memory(context, memory_context)
+
             # Step 1: Interpret intent
             intent = await self.intent_agent.interpret(
                 message,
-                conversation_context=self._build_context_string(context),
+                conversation_context=context_string,
             )
             logger.debug("Intent interpreted", intent_type=intent.type.value)
 
@@ -139,7 +195,7 @@ class AgentOrchestrator:
             # Step 2: Create plan
             plan = await self.planner_agent.create_plan(
                 intent,
-                conversation_context=self._build_context_string(context),
+                conversation_context=context_string,
             )
             logger.debug("Plan created", steps=len(plan.steps) if plan.steps else 0)
 
@@ -149,17 +205,19 @@ class AgentOrchestrator:
                     conversation_id, plan
                 )
 
-            # Step 3: Execute plan
+            # Step 3: Execute plan (with memory context for personalized responses)
             execution_result = await self.executor_agent.execute(
                 plan,
                 conversation_history=self._get_conversation_history(context),
+                memory_context=memory_context,  # Pass memory for personalized LLM responses
             )
             logger.debug("Plan executed", success=execution_result.success)
 
-            # Step 4: Verify results
+            # Step 4: Verify results (with memory context for consistency checking)
             verification = await self.verifier_agent.verify(
                 execution_result,
                 original_request=message,
+                memory_context=memory_context,  # Pass memory so verifier can check consistency
             )
             logger.debug("Results verified", valid=verification.is_valid)
 
@@ -169,17 +227,33 @@ class AgentOrchestrator:
                     plan, execution_result, verification, message
                 )
 
-            # Step 5: Generate explanation
+            # Step 5: Generate explanation (with memory context for personalization)
             explanation = await self.explainer_agent.explain(
                 intent=intent,
                 result=execution_result,
                 verification=verification,
+                memory_context=memory_context,  # Pass memory for personalized responses
             )
 
             # Update conversation context
             self._update_conversation_context(
                 context, message, explanation.response
             )
+
+            # Store assistant response in short-term memory
+            if self._memory is not None:
+                try:
+                    await self._memory.store_turn(
+                        conversation_id=conversation_id,
+                        role="assistant",
+                        content=explanation.response,
+                    )
+                    # Try to extract and store any memorable facts
+                    await self._extract_and_store_memories(
+                        message, explanation.response, verification
+                    )
+                except Exception as e:
+                    logger.warning("Failed to store memories", error=str(e))
 
             return AgentResult(
                 response=explanation.response,
@@ -317,6 +391,95 @@ class AgentOrchestrator:
         parts.append(f"Turn count: {context.turn_count}")
 
         return "\n".join(parts) if parts else ""
+
+    def _build_context_string_with_memory(
+        self,
+        context: ConversationContext,
+        memory_context: MemoryContext | None,
+    ) -> str:
+        """Build context string including memory."""
+        parts = []
+
+        # Add memory context first (summaries from retrieval pipeline)
+        if memory_context:
+            # User profile summary
+            if memory_context.user_profile_summary:
+                parts.append(f"User profile: {memory_context.user_profile_summary}")
+
+            # Recent conversation summary
+            if memory_context.recent_conversation_summary:
+                parts.append(f"Recent context: {memory_context.recent_conversation_summary}")
+
+            # Relevant memories summary
+            if memory_context.relevant_memories_summary:
+                parts.append(f"Relevant memories: {memory_context.relevant_memories_summary}")
+
+            # Episodic context summary
+            if memory_context.episodic_context_summary:
+                parts.append(f"Past actions: {memory_context.episodic_context_summary}")
+
+        # Add regular conversation context
+        base_context = self._build_context_string(context)
+        if base_context:
+            parts.append(base_context)
+
+        return "\n\n".join(parts) if parts else ""
+
+    async def _extract_and_store_memories(
+        self,
+        user_message: str,
+        assistant_response: str,
+        verification: "VerificationResult",  # type: ignore
+    ) -> None:
+        """Extract memorable facts from conversation and store them."""
+        if self._memory is None:
+            return
+
+        # Look for patterns that indicate memorable information
+        # This is a simple heuristic - could be enhanced with LLM extraction
+        memorable_patterns = [
+            "my name is",
+            "i am called",
+            "call me",
+            "i prefer",
+            "i like",
+            "i don't like",
+            "i live in",
+            "i work at",
+            "i work as",
+            "my favorite",
+            "remember that",
+            "please remember",
+            "don't forget",
+        ]
+
+        message_lower = user_message.lower()
+        for pattern in memorable_patterns:
+            if pattern in message_lower:
+                # Extract the fact and store it
+                try:
+                    # Create a simple write request
+                    request = MemoryWriteRequest(
+                        content=user_message,
+                        memory_type=MemoryType.SEMANTIC,
+                        source=MemorySource.CONVERSATION,
+                        confidence=0.8,
+                        metadata={"original_message": user_message},
+                    )
+                    # Auto-approve for simple facts
+                    approval = VerifierMemoryApproval(
+                        approved=True,
+                        reason="User explicitly shared personal information",
+                        confidence=0.8,
+                    )
+                    result = await self._memory.write_memory(request, approval)
+                    if result.success:
+                        logger.info("Stored memorable fact", pattern=pattern, memory_id=str(result.memory_id))
+                    else:
+                        logger.warning("Memory write failed", error=result.error)
+                except Exception as e:
+                    logger.warning("Failed to store memory", error=str(e))
+                break  # Only store once per message
 
     def _get_conversation_history(
         self, context: ConversationContext

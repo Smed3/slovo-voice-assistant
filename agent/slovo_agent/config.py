@@ -3,17 +3,21 @@ Configuration management for Slovo Agent Runtime.
 """
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal, Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Resolve .env path relative to this file (agent/.env)
+_ENV_FILE = Path(__file__).parent.parent / ".env"
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(_ENV_FILE) if _ENV_FILE.exists() else None,
         env_file_encoding="utf-8",
         extra="forbid",
     )
@@ -45,8 +49,15 @@ class Settings(BaseSettings):
     redis_url: str = Field(default="redis://localhost:6379", alias="REDIS_URL")
     qdrant_url: str = Field(default="http://localhost:6333", alias="QDRANT_URL")
     database_url: str = Field(
-        default="postgresql://localhost:5432/slovo", alias="DATABASE_URL"
+        default="postgresql://slovo:slovo_local_dev@localhost:5432/slovo", alias="DATABASE_URL"
     )
+
+    # Memory Configuration (Phase 3)
+    memory_redis_ttl: int = Field(default=7200, ge=60, alias="MEMORY_REDIS_TTL")  # 2 hours
+    memory_confidence_threshold: float = Field(
+        default=0.7, ge=0.0, le=1.0, alias="MEMORY_CONFIDENCE_THRESHOLD"
+    )
+    memory_token_limit: int = Field(default=2000, ge=100, le=8000, alias="MEMORY_TOKEN_LIMIT")
 
     # Voice Services
     stt_provider: str = Field(default="whisper", alias="STT_PROVIDER")
