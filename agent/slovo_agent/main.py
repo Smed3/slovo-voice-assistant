@@ -12,7 +12,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from slovo_agent.api.routes import router as api_router
+from slovo_agent.api.memory import set_memory_manager
+from slovo_agent.api.chat import set_chat_memory_manager
 from slovo_agent.config import settings
+from slovo_agent.memory import create_memory_manager, MemoryManager
 from slovo_agent.models import HealthResponse
 
 # Configure structured logging
@@ -36,20 +39,42 @@ structlog.configure(
 
 logger = structlog.get_logger(__name__)
 
-# Track uptime
+# Track uptime and memory manager
 _start_time: float = 0
+_memory_manager: MemoryManager | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
-    global _start_time
+    global _start_time, _memory_manager
     _start_time = asyncio.get_event_loop().time()
     
     logger.info("Starting Slovo Agent Runtime", version=settings.version)
     
-    # Initialize services
-    # TODO: Initialize Redis, Qdrant, PostgreSQL connections
+    # Initialize memory services
+    try:
+        _memory_manager = await create_memory_manager(
+            redis_url=settings.redis_url,
+            qdrant_url=settings.qdrant_url,
+            database_url=settings.database_url,
+        )
+        set_memory_manager(_memory_manager)
+        set_chat_memory_manager(_memory_manager)
+        
+        # Check memory health
+        health = await _memory_manager.health_check()
+        logger.info(
+            "Memory services initialized",
+            redis=health.get("redis", False),
+            qdrant=health.get("qdrant", False),
+            postgres=health.get("postgres", False),
+        )
+    except Exception as e:
+        logger.warning(
+            "Memory services initialization failed - running in degraded mode",
+            error=str(e),
+        )
     
     yield
     

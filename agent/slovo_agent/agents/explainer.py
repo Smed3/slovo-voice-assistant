@@ -12,6 +12,7 @@ from slovo_agent.models import (
     ExecutionResult,
     Explanation,
     Intent,
+    MemoryContext,
     ResponseGeneration,
     Verification,
 )
@@ -64,6 +65,7 @@ class ExplainerAgent:
         intent: Intent,
         result: ExecutionResult,
         verification: Verification,
+        memory_context: MemoryContext | None = None,
     ) -> Explanation:
         """
         Generate an explanation for the execution result.
@@ -72,19 +74,20 @@ class ExplainerAgent:
             intent: The original interpreted intent
             result: The execution result
             verification: The verification result
+            memory_context: Memory context with user info and conversation history
 
         Returns:
             Explanation with response and reasoning
         """
-        logger.debug("Generating explanation", success=result.success)
+        logger.debug("Generating explanation", success=result.success, has_memory=memory_context is not None)
 
         # If execution failed, use LLM to explain the failure nicely
         if not result.success:
-            return await self._explain_failure(intent, result, verification)
+            return await self._explain_failure(intent, result, verification, memory_context)
 
         # Use LLM for sophisticated explanation if available
         if self.llm and result.final_output:
-            generation = await self._llm_explain(intent, result, verification)
+            generation = await self._llm_explain(intent, result, verification, memory_context)
             return self._generation_to_explanation(result, verification, generation)
 
         # Fallback to simple explanation
@@ -95,19 +98,24 @@ class ExplainerAgent:
         intent: Intent,
         result: ExecutionResult,
         verification: Verification,
+        memory_context: MemoryContext | None = None,
     ) -> Explanation:
         """Generate an explanation for a failed execution."""
         error_message = result.error or "An unknown error occurred"
 
         if self.llm:
+            # Build memory context string for personalization
+            memory_info = self._format_memory_context(memory_context)
+            
             # Use LLM to generate a friendly failure explanation
             user_content = f"""The assistant failed to complete the user's request.
-
+{memory_info}
 Original request: "{intent.text}"
 Error: {error_message}
 Issues: {verification.issues}
 
-Generate a helpful, friendly explanation of what went wrong and what the user can do."""
+Generate a helpful, friendly explanation of what went wrong and what the user can do.
+IMPORTANT: Use any known user information (like their name) to personalize the response."""
 
             messages = [LLMMessage(role=MessageRole.USER, content=user_content)]
 
@@ -141,13 +149,17 @@ Generate a helpful, friendly explanation of what went wrong and what the user ca
         intent: Intent,
         result: ExecutionResult,
         verification: Verification,
+        memory_context: MemoryContext | None = None,
     ) -> ResponseGeneration:
         """Use LLM for sophisticated explanation generation."""
         assert self.llm is not None
 
+        # Build memory context string for personalization
+        memory_info = self._format_memory_context(memory_context)
+
         # Build context for explanation
         user_content = f"""Generate an explanation for this completed request:
-
+{memory_info}
 Original request: "{intent.text}"
 Intent type: {intent.type.value}
 
@@ -162,7 +174,8 @@ Verification:
 Steps taken:
 {self._format_steps(result)}
 
-Generate a polished explanation with appropriate tone and any needed caveats."""
+Generate a polished explanation with appropriate tone and any needed caveats.
+IMPORTANT: Use any known user information (like their name) to personalize the response. If you know the user's name, use it!"""
 
         messages = [LLMMessage(role=MessageRole.USER, content=user_content)]
 
@@ -275,3 +288,27 @@ Generate a polished explanation with appropriate tone and any needed caveats."""
             steps_info.append(f"{status} {step.type.value}: {step.description}")
 
         return "\n".join(steps_info)
+
+    def _format_memory_context(self, memory_context: MemoryContext | None) -> str:
+        """Format memory context for LLM prompt injection."""
+        if not memory_context:
+            return ""
+        
+        parts: list[str] = []
+        
+        if memory_context.user_profile_summary:
+            parts.append(f"User Profile: {memory_context.user_profile_summary}")
+        
+        if memory_context.recent_conversation_summary:
+            parts.append(f"Recent Conversation: {memory_context.recent_conversation_summary}")
+        
+        if memory_context.relevant_memories_summary:
+            parts.append(f"Relevant Memories: {memory_context.relevant_memories_summary}")
+        
+        if memory_context.episodic_context_summary:
+            parts.append(f"Past Actions: {memory_context.episodic_context_summary}")
+        
+        if not parts:
+            return ""
+        
+        return "\n--- MEMORY CONTEXT (use this to personalize response) ---\n" + "\n".join(parts) + "\n--- END MEMORY CONTEXT ---\n"

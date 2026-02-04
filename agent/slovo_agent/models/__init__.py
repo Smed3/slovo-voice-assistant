@@ -57,6 +57,48 @@ from slovo_agent.models.reasoning import (
     AgentState,
 )
 
+from slovo_agent.models.memory import (
+    # Enums
+    MemoryType,
+    MemorySource,
+    StoreLocation,
+    PreferenceSource,
+    EpisodicActionType,
+    # Base models
+    MemoryEntry,
+    MemoryMetadata,
+    # Semantic memory
+    SemanticMetadata,
+    SemanticMemoryEntry,
+    SemanticSearchResult,
+    # Episodic memory
+    EpisodicLogMetadata,
+    EpisodicLogEntry,
+    # Preferences
+    UserPreference,
+    UserProfile,
+    # Short-term memory
+    ConversationTurn,
+    SessionContext,
+    WorkingMemoryState,
+    # Retrieval
+    MemoryContext,
+    MemoryRetrievalRequest,
+    # Write
+    MemoryWriteRequest,
+    MemoryWriteResult,
+    VerifierMemoryApproval,
+    # Inspector API
+    MemoryListRequest,
+    MemoryListItem,
+    MemoryListResponse,
+    MemoryDetailResponse,
+    MemoryUpdateRequest,
+    MemoryDeleteRequest,
+    MemoryResetRequest,
+    MemoryResetResponse,
+)
+
 __all__ = [
     # Intent models
     "IntentType",
@@ -104,4 +146,43 @@ __all__ = [
     # Reasoning models - Context
     "ConversationContext",
     "AgentState",
+    # Memory models - Enums
+    "MemoryType",
+    "MemorySource",
+    "StoreLocation",
+    "PreferenceSource",
+    "EpisodicActionType",
+    # Memory models - Base
+    "MemoryEntry",
+    "MemoryMetadata",
+    # Memory models - Semantic
+    "SemanticMetadata",
+    "SemanticMemoryEntry",
+    "SemanticSearchResult",
+    # Memory models - Episodic
+    "EpisodicLogMetadata",
+    "EpisodicLogEntry",
+    # Memory models - Preferences
+    "UserPreference",
+    "UserProfile",
+    # Memory models - Short-term
+    "ConversationTurn",
+    "SessionContext",
+    "WorkingMemoryState",
+    # Memory models - Retrieval
+    "MemoryContext",
+    "MemoryRetrievalRequest",
+    # Memory models - Write
+    "MemoryWriteRequest",
+    "MemoryWriteResult",
+    "VerifierMemoryApproval",
+    # Memory models - Inspector API
+    "MemoryListRequest",
+    "MemoryListItem",
+    "MemoryListResponse",
+    "MemoryDetailResponse",
+    "MemoryUpdateRequest",
+    "MemoryDeleteRequest",
+    "MemoryResetRequest",
+    "MemoryResetResponse",
 ]

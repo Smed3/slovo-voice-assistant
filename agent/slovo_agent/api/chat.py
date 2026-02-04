@@ -3,7 +3,7 @@ Chat API endpoints.
 """
 
 import uuid
-from typing import AsyncGenerator, Optional
+from typing import TYPE_CHECKING, AsyncGenerator, Optional
 
 import structlog
 from fastapi import APIRouter
@@ -16,18 +16,31 @@ from slovo_agent.models import (
     ConversationHistoryResponse,
 )
 
+if TYPE_CHECKING:
+    from slovo_agent.memory import MemoryManager
+
 logger = structlog.get_logger(__name__)
 router = APIRouter()
 
 # Global orchestrator instance (will be properly initialized in lifespan)
 _orchestrator: Optional[AgentOrchestrator] = None
+_memory_manager: "Optional[MemoryManager]" = None
+
+
+def set_chat_memory_manager(manager: "MemoryManager") -> None:
+    """Set the memory manager for chat (called during app init)."""
+    global _memory_manager, _orchestrator
+    _memory_manager = manager
+    # Also update the orchestrator if it exists
+    if _orchestrator is not None:
+        _orchestrator.set_memory_manager(manager)
 
 
 def get_orchestrator() -> AgentOrchestrator:
     """Get or create the agent orchestrator."""
     global _orchestrator
     if _orchestrator is None:
-        _orchestrator = AgentOrchestrator()
+        _orchestrator = AgentOrchestrator(memory_manager=_memory_manager)
     return _orchestrator
 
 

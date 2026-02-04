@@ -107,10 +107,14 @@ class OpenAIProvider(LLMProvider):
         schema_name = output_schema.__name__
 
         # Add instruction to system prompt for structured output
+        # Include full schema for nested objects, but with clear instructions
         schema_instruction = (
-            f"\n\nYou must respond with a valid JSON object that matches this schema:\n"
-            f"```json\n{json.dumps(schema, indent=2)}\n```\n"
-            f"Only output the JSON object, nothing else."
+            f"\n\n**OUTPUT FORMAT REQUIREMENT**\n"
+            f"You MUST respond with a JSON object that conforms to the following schema.\n"
+            f"The schema below describes the STRUCTURE your response must follow.\n"
+            f"Do NOT return the schema itself - return actual DATA that fits this structure.\n\n"
+            f"Schema:\n```json\n{json.dumps(schema, indent=2)}\n```\n\n"
+            f"Remember: Output a JSON object with real values, not the schema definition."
         )
 
         if system_prompt:

@@ -6,10 +6,9 @@ a single source of truth for type definitions.
 """
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # =============================================================================
 # Intent Models
@@ -17,7 +16,7 @@ from pydantic import BaseModel, Field
 
 class IntentType(str, Enum):
     """Types of user intents."""
-    
+
     QUESTION = "question"
     COMMAND = "command"
     CONVERSATION = "conversation"
@@ -28,14 +27,14 @@ class IntentType(str, Enum):
 
 class Intent(BaseModel):
     """Parsed user intent."""
-    
+
     type: IntentType
     text: str
     language: str = "en"
     entities: dict[str, Any] = {}
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     requires_tool: bool = False
-    tool_hint: Optional[str] = None
+    tool_hint: str | None = None
 
 
 # =============================================================================
@@ -44,7 +43,7 @@ class Intent(BaseModel):
 
 class StepType(str, Enum):
     """Types of execution steps."""
-    
+
     LLM_RESPONSE = "llm_response"
     TOOL_EXECUTION = "tool_execution"
     TOOL_DISCOVERY = "tool_discovery"
@@ -54,21 +53,23 @@ class StepType(str, Enum):
 
 class PlanStep(BaseModel):
     """A single step in an execution plan."""
-    
+
     type: StepType
     description: str
-    tool_name: Optional[str] = None
+    tool_name: str | None = None
     tool_params: dict[str, Any] = {}
     depends_on: list[int] = []
 
 
 class ExecutionPlan(BaseModel):
     """Complete execution plan for handling a user request."""
-    
+
     intent: Intent
     steps: list["PlanStep"] = []
     requires_approval: bool = False
     estimated_complexity: str = "simple"
+    requires_verification: bool = True
+    requires_explanation: bool = True
 
 
 # =============================================================================
@@ -77,21 +78,21 @@ class ExecutionPlan(BaseModel):
 
 class StepResult(BaseModel):
     """Result of executing a single step."""
-    
+
     step_index: int
     success: bool
     output: Any = None
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class ExecutionResult(BaseModel):
     """Complete result of plan execution."""
-    
+
     plan: ExecutionPlan
     success: bool
     step_results: list["StepResult"] = []
     final_output: Any = None
-    error: Optional[str] = None
+    error: str | None = None
 
 
 # =============================================================================
@@ -100,13 +101,13 @@ class ExecutionResult(BaseModel):
 
 class Verification(BaseModel):
     """Result of verifying execution output."""
-    
+
     is_valid: bool
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     issues: list[str] = []
     suggestions: list[str] = []
     requires_correction: bool = False
-    correction_hint: Optional[str] = None
+    correction_hint: str | None = None
 
 
 # =============================================================================
@@ -115,11 +116,11 @@ class Verification(BaseModel):
 
 class Explanation(BaseModel):
     """User-facing explanation of agent actions."""
-    
+
     response: str
-    reasoning: Optional[str] = None
+    reasoning: str | None = None
     actions_taken: list[str] = []
-    confidence_note: Optional[str] = None
+    confidence_note: str | None = None
 
 
 # =============================================================================
@@ -128,9 +129,9 @@ class Explanation(BaseModel):
 
 class AgentResult(BaseModel):
     """Result from agent processing."""
-    
+
     response: str
-    reasoning: Optional[str] = None
+    reasoning: str | None = None
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
 
 
@@ -140,7 +141,7 @@ class AgentResult(BaseModel):
 
 class HealthResponse(BaseModel):
     """Health check response model."""
-    
+
     status: str
     version: str
     uptime: float
@@ -148,33 +149,33 @@ class HealthResponse(BaseModel):
 
 class ChatRequest(BaseModel):
     """Chat request model."""
-    
+
     message: str = Field(..., min_length=1, max_length=10000)
-    conversation_id: Optional[str] = None
+    conversation_id: str | None = None
 
 
 class ChatResponse(BaseModel):
     """Chat response model."""
-    
+
     id: str
     response: str
     conversation_id: str
-    reasoning: Optional[str] = None
+    reasoning: str | None = None
 
 
 class ConversationMessage(BaseModel):
     """A single message in conversation history."""
-    
+
     id: str
     role: str  # 'user' or 'assistant'
     content: str
-    timestamp: Optional[str] = None
-    reasoning: Optional[str] = None
+    timestamp: str | None = None
+    reasoning: str | None = None
 
 
 class ConversationHistoryResponse(BaseModel):
     """Conversation history response model."""
-    
+
     conversation_id: str
     messages: list["ConversationMessage"] = []
 
@@ -185,7 +186,7 @@ class ConversationHistoryResponse(BaseModel):
 
 class ToolManifest(BaseModel):
     """Tool manifest describing a tool's capabilities."""
-    
+
     name: str
     version: str
     description: str

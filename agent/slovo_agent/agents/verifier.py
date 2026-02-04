@@ -10,6 +10,7 @@ import structlog
 from slovo_agent.llm.base import LLMMessage, LLMProvider, MessageRole
 from slovo_agent.models import (
     ExecutionResult,
+    MemoryContext,
     UncertaintyLevel,
     Verification,
     VerificationAnalysis,
@@ -68,6 +69,7 @@ class VerifierAgent:
         self,
         result: ExecutionResult,
         original_request: str | None = None,
+        memory_context: MemoryContext | None = None,
     ) -> Verification:
         """
         Verify an execution result.
@@ -75,15 +77,16 @@ class VerifierAgent:
         Args:
             result: The execution result to verify
             original_request: Optional original user request for context
+            memory_context: Memory context to check for consistency
 
         Returns:
             Verification result with confidence and issues
         """
-        logger.debug("Verifying execution result", success=result.success)
+        logger.debug("Verifying execution result", success=result.success, has_memory=memory_context is not None)
 
         # Use LLM for sophisticated verification if available
         if self.llm and result.success and result.final_output:
-            analysis = await self._llm_verify(result, original_request)
+            analysis = await self._llm_verify(result, original_request, memory_context)
             return self._analysis_to_verification(analysis)
 
         # Fallback to simple heuristic verification
@@ -93,16 +96,29 @@ class VerifierAgent:
         self,
         result: ExecutionResult,
         original_request: str | None = None,
+        memory_context: MemoryContext | None = None,
     ) -> VerificationAnalysis:
         """Use LLM for sophisticated result verification."""
         assert self.llm is not None
 
         # Build verification context
         request_text = original_request or result.plan.intent.text
+        
+        # Build memory context string for consistency checking
+        memory_info = ""
+        if memory_context:
+            memory_parts = []
+            if memory_context.user_profile_summary:
+                memory_parts.append(f"User Profile: {memory_context.user_profile_summary}")
+            if memory_context.relevant_memories_summary:
+                memory_parts.append(f"Known Facts: {memory_context.relevant_memories_summary}")
+            if memory_context.recent_conversation_summary:
+                memory_parts.append(f"Recent Conversation: {memory_context.recent_conversation_summary}")
+            if memory_parts:
+                memory_info = "\n--- KNOWN MEMORY CONTEXT (check response consistency) ---\n" + "\n".join(memory_parts) + "\n--- END MEMORY CONTEXT ---\n\n"
 
         user_content = f"""Verify this assistant response:
-
-Original request: "{request_text}"
+{memory_info}Original request: "{request_text}"
 
 Response to verify:
 {result.final_output}
@@ -110,7 +126,8 @@ Response to verify:
 Execution steps completed:
 {self._format_steps(result)}
 
-Please assess the quality, accuracy, and completeness of this response."""
+Please assess the quality, accuracy, and completeness of this response.
+IMPORTANT: If memory context includes known facts (like user's name), verify the response uses them correctly and consistently."""
 
         messages = [LLMMessage(role=MessageRole.USER, content=user_content)]
 

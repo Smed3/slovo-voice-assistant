@@ -8,7 +8,7 @@ uncertainty signaling, and clarification requests.
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # =============================================================================
@@ -56,6 +56,14 @@ class ClarificationRequest(BaseModel):
     context: str | None = Field(
         default=None, description="Additional context about what was unclear"
     )
+
+    @field_validator("options", mode="before")
+    @classmethod
+    def default_options(cls, v: list[str] | None) -> list[str]:
+        """Handle None value for options - use empty list as default."""
+        if v is None:
+            return []
+        return v
 
 
 # =============================================================================
@@ -110,13 +118,21 @@ class IntentAnalysis(BaseModel):
     )
 
     # Clarification
-    clarification: ClarificationRequest = Field(
-        default_factory=lambda: ClarificationRequest(needed=False),
+    clarification: ClarificationRequest | None = Field(
+        default=None,
         description="Clarification request if needed",
     )
 
     # Reasoning trace
     reasoning: str = Field(description="Explanation of the interpretation process")
+
+    @field_validator("clarification", mode="before")
+    @classmethod
+    def default_clarification(cls, v: ClarificationRequest | None) -> ClarificationRequest:
+        """Provide default clarification request if None."""
+        if v is None:
+            return ClarificationRequest(needed=False)
+        return v
 
 
 # =============================================================================
@@ -181,8 +197,8 @@ class ExecutionPlanAnalysis(BaseModel):
     )
 
     # Risk assessment
-    risk: RiskAssessment = Field(
-        default_factory=lambda: RiskAssessment(level="low"),
+    risk: RiskAssessment | None = Field(
+        default=None,
         description="Risk assessment",
     )
 
@@ -196,13 +212,29 @@ class ExecutionPlanAnalysis(BaseModel):
     )
 
     # Clarification
-    clarification: ClarificationRequest = Field(
-        default_factory=lambda: ClarificationRequest(needed=False),
+    clarification: ClarificationRequest | None = Field(
+        default=None,
         description="Clarification request if needed before planning",
     )
 
     # Reasoning
     reasoning: str = Field(description="Explanation of the planning process")
+
+    @field_validator("risk", mode="before")
+    @classmethod
+    def default_risk(cls, v: RiskAssessment | None) -> RiskAssessment:
+        """Provide default risk assessment if None."""
+        if v is None:
+            return RiskAssessment(level="low")
+        return v
+
+    @field_validator("clarification", mode="before")
+    @classmethod
+    def default_clarification(cls, v: ClarificationRequest | None) -> ClarificationRequest:
+        """Provide default clarification request if None."""
+        if v is None:
+            return ClarificationRequest(needed=False)
+        return v
 
 
 # =============================================================================

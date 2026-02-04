@@ -1,0 +1,91 @@
+# Docker Compose configuration for Slovo Memory Services
+# Phase 3: Local-only infrastructure for memory system
+
+version: "3.9"
+
+services:
+  # =============================================================================
+  # Redis - Short-Term Working Memory
+  # =============================================================================
+  # Purpose: Session/working memory only
+  # Data: Non-authoritative and non-persistent
+  # TTL: Default 2 hours, configurable
+  redis:
+    image: redis:7-alpine
+    container_name: slovo-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: >
+      redis-server
+      --appendonly no
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
+  # Qdrant - Long-Term Semantic Memory
+  # =============================================================================
+  # Purpose: Semantic recall only
+  # Collection: semantic_memory
+  # Storage: Encrypted at rest via volume encryption
+  qdrant:
+    image: qdrant/qdrant:v1.15.0
+    container_name: slovo-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      QDRANT__LOG_LEVEL: INFO
+      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__SERVICE__GRPC_PORT: 6334
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
+  # PostgreSQL - Structured Memory
+  # =============================================================================
+  # Purpose: Deterministic facts & preferences
+  # Rules: Single user, no auth tables, no multi-tenant logic
+  postgres:
+    image: postgres:16-alpine
+    container_name: slovo-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./agent/scripts/init_db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    environment:
+      POSTGRES_USER: slovo
+      POSTGRES_PASSWORD: slovo_local_dev
+      POSTGRES_DB: slovo
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U slovo -d slovo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  redis_data:
+    driver: local
+  qdrant_data:
+    driver: local
+  postgres_data:
+    driver: local
+
+networks:
+  default:
+    name: slovo-network

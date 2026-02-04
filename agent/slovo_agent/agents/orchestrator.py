@@ -5,7 +5,9 @@ Integrates with LLM providers for intelligent reasoning and
 supports clarification requests for uncertain situations.
 """
 
-from typing import AsyncGenerator
+import asyncio
+from collections.abc import AsyncGenerator
+from typing import TYPE_CHECKING
 
 import structlog
 
@@ -20,8 +22,20 @@ from slovo_agent.models import (
     AgentResult,
     ClarificationRequest,
     ConversationContext,
+    ExecutionPlan,
     IntentType,
+    MemoryContext,
+    MemorySource,
+    MemoryType,
+    MemoryWriteRequest,
+    PlanStep,
+    StepType,
+    Verification,
+    VerifierMemoryApproval,
 )
+
+if TYPE_CHECKING:
+    from slovo_agent.memory import MemoryManager
 
 logger = structlog.get_logger(__name__)
 
@@ -43,10 +57,17 @@ class AgentOrchestrator:
     - Conversation context tracking
     """
 
-    def __init__(self, llm_provider: LLMProvider | None = None) -> None:
+    def __init__(
+        self,
+        llm_provider: LLMProvider | None = None,
+        memory_manager: "MemoryManager | None" = None,
+    ) -> None:
         # Initialize LLM provider
         self.llm: LLMProvider | None = llm_provider
         self._init_llm_provider()
+
+        # Memory manager (optional, enables long-term memory)
+        self._memory: MemoryManager | None = memory_manager
 
         # Initialize agents with LLM provider
         self.intent_agent = IntentInterpreterAgent(self.llm)
@@ -65,7 +86,13 @@ class AgentOrchestrator:
         logger.info(
             "Agent orchestrator initialized",
             has_llm=self.llm is not None,
+            has_memory=self._memory is not None,
         )
+
+    def set_memory_manager(self, manager: "MemoryManager") -> None:
+        """Set memory manager for long-term memory support."""
+        self._memory = manager
+        logger.info("Memory manager set for orchestrator")
 
     def _init_llm_provider(self) -> None:
         """Initialize LLM provider if not provided."""
@@ -120,28 +147,126 @@ class AgentOrchestrator:
         context = self._get_conversation_context(conversation_id)
 
         try:
+            # Store the user message in short-term memory
+            if self._memory is not None:
+                try:
+                    await self._memory.store_turn(
+                        conversation_id=conversation_id,
+                        role="user",
+                        content=message,
+                    )
+                    logger.info("User turn stored in memory", conversation_id=conversation_id)
+                except Exception as e:
+                    logger.warning("Failed to store user turn", error=str(e))
+            else:
+                logger.warning("Memory manager not available - turns will not be persisted")
+
             # Check if this is a response to a pending clarification
             if conversation_id in self.pending_clarifications:
                 return await self._handle_clarification_response(
                     message, conversation_id, context
                 )
 
+            # OPTIMIZATION: Parallelize memory retrieval and intent interpretation
+            # These are independent operations
+            memory_context: MemoryContext | None = None
+            memory_task = None
+            if self._memory is not None:
+                memory_task = asyncio.create_task(
+                    self._memory.retrieve_context(
+                        user_message=message,
+                        conversation_id=conversation_id,
+                    )
+                )
+
+            # Build context string for intent (without full memory yet)
+            context_string = self._build_context_string(context)
+
             # Step 1: Interpret intent
             intent = await self.intent_agent.interpret(
                 message,
-                conversation_context=self._build_context_string(context),
+                conversation_context=context_string,
             )
             logger.debug("Intent interpreted", intent_type=intent.type.value)
 
-            # Check if clarification is needed from intent interpretation
-            # Note: We check via the interpret method's internal analysis
+            # Wait for memory retrieval to complete
+            if memory_task is not None:
+                try:
+                    memory_context = await memory_task
+                    logger.debug(
+                        "Memory context retrieved",
+                        has_profile=bool(memory_context.user_profile_summary),
+                        has_semantic=bool(memory_context.relevant_memories_summary),
+                        has_conversation=bool(memory_context.recent_conversation_summary),
+                        total_tokens=memory_context.total_token_estimate,
+                    )
+                except Exception as e:
+                    logger.warning("Failed to retrieve memory context", error=str(e))
 
-            # Step 2: Create plan
+            # Build full context string with memory
+            context_string = self._build_context_string_with_memory(context, memory_context)
+
+            # OPTIMIZATION: Fast path for simple intents
+            # Skip planner, verifier, and explainer for conversational intents
+            if self._is_simple_intent(intent):
+                logger.info("Fast path: simple intent detected", intent_type=intent.type.value)
+
+                # Create a minimal plan with just LLM response
+                plan = ExecutionPlan(
+                    intent=intent,
+                    steps=[
+                        PlanStep(
+                            type=StepType.LLM_RESPONSE,
+                            description="Generate conversational response",
+                        )
+                    ],
+                    estimated_complexity="simple",
+                    requires_verification=False,
+                    requires_explanation=False,
+                )
+
+                # Execute directly
+                execution_result = await self.executor_agent.execute(
+                    plan,
+                    conversation_history=self._get_conversation_history(context),
+                    memory_context=memory_context,
+                )
+                logger.debug("Fast path execution complete", success=execution_result.success)
+
+                # Extract response directly from execution result
+                response = execution_result.final_output or "I'm here to help!"
+
+                # Update conversation context
+                self._update_conversation_context(context, message, response)
+
+                # Store assistant response
+                if self._memory is not None:
+                    try:
+                        await self._memory.store_turn(
+                            conversation_id=conversation_id,
+                            role="assistant",
+                            content=response,
+                        )
+                    except Exception as e:
+                        logger.warning("Failed to store assistant turn", error=str(e))
+
+                return AgentResult(
+                    response=response,
+                    reasoning="Simple conversational response",
+                    confidence=1.0,
+                )
+
+            # Step 2: Create plan (for complex intents)
             plan = await self.planner_agent.create_plan(
                 intent,
-                conversation_context=self._build_context_string(context),
+                conversation_context=context_string,
             )
-            logger.debug("Plan created", steps=len(plan.steps) if plan.steps else 0)
+            logger.debug(
+                "Plan created",
+                steps=len(plan.steps) if plan.steps else 0,
+                requires_verification=plan.requires_verification,
+                requires_explanation=plan.requires_explanation,
+            )
 
             # Check if plan requires clarification
             if self._plan_needs_clarification(plan):
@@ -149,41 +274,80 @@ class AgentOrchestrator:
                     conversation_id, plan
                 )
 
-            # Step 3: Execute plan
+            # Step 3: Execute plan (with memory context for personalized responses)
             execution_result = await self.executor_agent.execute(
                 plan,
                 conversation_history=self._get_conversation_history(context),
+                memory_context=memory_context,
             )
             logger.debug("Plan executed", success=execution_result.success)
 
-            # Step 4: Verify results
-            verification = await self.verifier_agent.verify(
-                execution_result,
-                original_request=message,
-            )
-            logger.debug("Results verified", valid=verification.is_valid)
+            # OPTIMIZATION: Skip verification for low-risk plans
+            verification = None
+            if plan.requires_verification:
+                # Step 4: Verify results (with memory context for consistency checking)
+                verification = await self.verifier_agent.verify(
+                    execution_result,
+                    original_request=message,
+                    memory_context=memory_context,
+                )
+                logger.debug("Results verified", valid=verification.is_valid)
 
-            # Self-correction if needed
-            if verification.requires_correction and self.max_retries > 0:
-                execution_result, verification = await self._attempt_correction(
-                    plan, execution_result, verification, message
+                # Self-correction if needed
+                if verification.requires_correction and self.max_retries > 0:
+                    execution_result, verification = await self._attempt_correction(
+                        plan, execution_result, verification, message
+                    )
+            else:
+                logger.debug("Verification skipped for low-risk plan")
+                # Create a simple verification result
+                from slovo_agent.models import Verification
+                verification = Verification(
+                    is_valid=True,
+                    confidence=0.9,
+                    issues=[],
+                    correction_hint=None,
                 )
 
-            # Step 5: Generate explanation
-            explanation = await self.explainer_agent.explain(
-                intent=intent,
-                result=execution_result,
-                verification=verification,
-            )
+            # OPTIMIZATION: Skip explainer if execution produced direct response
+            # and explanation is not required
+            explanation = None
+            if not plan.requires_explanation and execution_result.final_output:
+                logger.debug("Explainer skipped - using direct execution output")
+                response = execution_result.final_output
+                reasoning = "Direct execution response"
+            else:
+                # Step 5: Generate explanation (with memory context for personalization)
+                explanation = await self.explainer_agent.explain(
+                    intent=intent,
+                    result=execution_result,
+                    verification=verification,
+                    memory_context=memory_context,
+                )
+                response = explanation.response
+                reasoning = explanation.reasoning
 
             # Update conversation context
-            self._update_conversation_context(
-                context, message, explanation.response
-            )
+            self._update_conversation_context(context, message, response)
+
+            # Store assistant response in short-term memory
+            if self._memory is not None:
+                try:
+                    await self._memory.store_turn(
+                        conversation_id=conversation_id,
+                        role="assistant",
+                        content=response,
+                    )
+                    # Try to extract and store any memorable facts
+                    await self._extract_and_store_memories(
+                        message, response, verification
+                    )
+                except Exception as e:
+                    logger.warning("Failed to store memories", error=str(e))
 
             return AgentResult(
-                response=explanation.response,
-                reasoning=explanation.reasoning,
+                response=response,
+                reasoning=reasoning,
                 confidence=verification.confidence,
             )
 
@@ -197,6 +361,32 @@ class AgentOrchestrator:
                 reasoning=f"Error: {str(e)}",
                 confidence=0.0,
             )
+
+    def _is_simple_intent(self, intent) -> bool:
+        """
+        Check if an intent is simple and can use the fast path.
+
+        Simple intents include greetings, farewells, and basic conversation
+        that don't require tool execution or complex reasoning.
+        """
+        # Conversational intents are typically simple
+        if intent.type == IntentType.CONVERSATION:
+            return True
+
+        # Questions that don't require tools are simple
+        if intent.type == IntentType.QUESTION and not intent.requires_tool:
+            # Check for greeting patterns
+            message_lower = intent.text.lower()
+            greeting_patterns = [
+                "hello", "hi", "hey", "greetings", "good morning",
+                "good afternoon", "good evening", "howdy",
+                "goodbye", "bye", "see you", "farewell",
+                "thanks", "thank you", "thx",
+            ]
+            if any(pattern in message_lower for pattern in greeting_patterns):
+                return True
+
+        return False
 
     async def _attempt_correction(
         self,
@@ -317,6 +507,95 @@ class AgentOrchestrator:
         parts.append(f"Turn count: {context.turn_count}")
 
         return "\n".join(parts) if parts else ""
+
+    def _build_context_string_with_memory(
+        self,
+        context: ConversationContext,
+        memory_context: MemoryContext | None,
+    ) -> str:
+        """Build context string including memory."""
+        parts = []
+
+        # Add memory context first (summaries from retrieval pipeline)
+        if memory_context:
+            # User profile summary
+            if memory_context.user_profile_summary:
+                parts.append(f"User profile: {memory_context.user_profile_summary}")
+
+            # Recent conversation summary
+            if memory_context.recent_conversation_summary:
+                parts.append(f"Recent context: {memory_context.recent_conversation_summary}")
+
+            # Relevant memories summary
+            if memory_context.relevant_memories_summary:
+                parts.append(f"Relevant memories: {memory_context.relevant_memories_summary}")
+
+            # Episodic context summary
+            if memory_context.episodic_context_summary:
+                parts.append(f"Past actions: {memory_context.episodic_context_summary}")
+
+        # Add regular conversation context
+        base_context = self._build_context_string(context)
+        if base_context:
+            parts.append(base_context)
+
+        return "\n\n".join(parts) if parts else ""
+
+    async def _extract_and_store_memories(
+        self,
+        user_message: str,
+        assistant_response: str,
+        verification: Verification | None,
+    ) -> None:
+        """Extract memorable facts from conversation and store them."""
+        if self._memory is None:
+            return
+
+        # Look for patterns that indicate memorable information
+        # This is a simple heuristic - could be enhanced with LLM extraction
+        memorable_patterns = [
+            "my name is",
+            "i am called",
+            "call me",
+            "i prefer",
+            "i like",
+            "i don't like",
+            "i live in",
+            "i work at",
+            "i work as",
+            "my favorite",
+            "remember that",
+            "please remember",
+            "don't forget",
+        ]
+
+        message_lower = user_message.lower()
+        for pattern in memorable_patterns:
+            if pattern in message_lower:
+                # Extract the fact and store it
+                try:
+                    # Create a simple write request
+                    request = MemoryWriteRequest(
+                        content=user_message,
+                        memory_type=MemoryType.SEMANTIC,
+                        source=MemorySource.CONVERSATION,
+                        confidence=0.8,
+                        metadata={"original_message": user_message},
+                    )
+                    # Auto-approve for simple facts
+                    approval = VerifierMemoryApproval(
+                        approved=True,
+                        reason="User explicitly shared personal information",
+                        confidence=0.8,
+                    )
+                    result = await self._memory.write_memory(request, approval)
+                    if result.success:
+                        logger.info("Stored memorable fact", pattern=pattern, memory_id=str(result.memory_id))
+                    else:
+                        logger.warning("Memory write failed", error=result.error)
+                except Exception as e:
+                    logger.warning("Failed to store memory", error=str(e))
+                break  # Only store once per message
 
     def _get_conversation_history(
         self, context: ConversationContext

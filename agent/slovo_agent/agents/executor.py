@@ -13,6 +13,7 @@ from slovo_agent.llm.base import LLMMessage, LLMProvider, MessageRole
 from slovo_agent.models import (
     ExecutionPlan,
     ExecutionResult,
+    MemoryContext,
     PlanStep,
     StepResult,
     StepType,
@@ -64,6 +65,7 @@ class ExecutorAgent:
         self,
         plan: ExecutionPlan,
         conversation_history: list[dict[str, str]] | None = None,
+        memory_context: MemoryContext | None = None,
     ) -> ExecutionResult:
         """
         Execute an execution plan.
@@ -71,16 +73,18 @@ class ExecutorAgent:
         Args:
             plan: The execution plan to execute
             conversation_history: Optional conversation history for context
+            memory_context: Memory context with user info and relevant memories
 
         Returns:
             ExecutionResult with all step results
         """
-        logger.debug("Executing plan", steps=len(plan.steps))
+        logger.debug("Executing plan", steps=len(plan.steps), has_memory=memory_context is not None)
 
         step_results: list[StepResult] = []
         context: dict[str, Any] = {
             "intent": plan.intent.text,
             "conversation_history": conversation_history or [],
+            "memory_context": memory_context,
         }
 
         for i, step in enumerate(plan.steps):
@@ -282,10 +286,23 @@ class ExecutorAgent:
         # Build context summary
         context_parts = []
 
-        # Add memory context
-        memories = context.get("step_0", {}).get("memories", [])
-        if memories:
-            context_parts.append(f"Relevant memories: {memories}")
+        # Add memory context from pre-retrieval pipeline (prioritize this)
+        memory_ctx: MemoryContext | None = context.get("memory_context")
+        if memory_ctx:
+            if memory_ctx.user_profile_summary:
+                context_parts.append(f"User Profile: {memory_ctx.user_profile_summary}")
+            if memory_ctx.relevant_memories_summary:
+                context_parts.append(f"Relevant Memories (IMPORTANT - use to personalize response): {memory_ctx.relevant_memories_summary}")
+            if memory_ctx.recent_conversation_summary:
+                context_parts.append(f"Recent Conversation: {memory_ctx.recent_conversation_summary}")
+            if memory_ctx.episodic_context_summary:
+                context_parts.append(f"Past Actions: {memory_ctx.episodic_context_summary}")
+        
+        # Fallback to step-based memories if no pre-retrieved context
+        if not context_parts:
+            memories = context.get("step_0", {}).get("memories", [])
+            if memories:
+                context_parts.append(f"Relevant memories: {memories}")
 
         # Add tool outputs
         for key, value in context.items():
