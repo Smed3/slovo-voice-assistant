@@ -87,10 +87,12 @@ class ToolRepository:
                     INSERT INTO tool_manifest (
                         id, name, version, description, source_type, source_location,
                         status, openapi_spec, capabilities, parameters_schema,
+                        execution_type, docker_image, docker_entrypoint, execution_timeout,
                         created_at, updated_at
                     ) VALUES (
                         :id, :name, :version, :description, :source_type, :source_location,
                         :status, :openapi_spec, :capabilities, :parameters_schema,
+                        :execution_type, :docker_image, :docker_entrypoint, :execution_timeout,
                         :created_at, :updated_at
                     )
                 """),
@@ -105,6 +107,10 @@ class ToolRepository:
                     "openapi_spec": manifest.openapi_spec,
                     "capabilities": manifest.capabilities,
                     "parameters_schema": manifest.parameters_schema,
+                    "execution_type": manifest.execution_type,
+                    "docker_image": manifest.docker_image,
+                    "docker_entrypoint": manifest.docker_entrypoint,
+                    "execution_timeout": manifest.execution_timeout,
                     "created_at": now,
                     "updated_at": now,
                 },
@@ -133,6 +139,7 @@ class ToolRepository:
                 text("""
                     SELECT id, name, version, description, source_type, source_location,
                            status, openapi_spec, capabilities, parameters_schema,
+                           execution_type, docker_image, docker_entrypoint, execution_timeout,
                            created_at, updated_at, approved_at, revoked_at
                     FROM tool_manifest
                     WHERE id = :id
@@ -155,10 +162,14 @@ class ToolRepository:
                 openapi_spec=row[7],
                 capabilities=row[8] or [],
                 parameters_schema=row[9] or {},
-                created_at=row[10],
-                updated_at=row[11],
-                approved_at=row[12],
-                revoked_at=row[13],
+                execution_type=row[10],
+                docker_image=row[11],
+                docker_entrypoint=row[12],
+                execution_timeout=row[13],
+                created_at=row[14],
+                updated_at=row[15],
+                approved_at=row[16],
+                revoked_at=row[17],
             )
 
     async def get_tool_manifest_by_name(self, name: str) -> ToolManifestDB | None:
@@ -176,6 +187,7 @@ class ToolRepository:
                 text("""
                     SELECT id, name, version, description, source_type, source_location,
                            status, openapi_spec, capabilities, parameters_schema,
+                           execution_type, docker_image, docker_entrypoint, execution_timeout,
                            created_at, updated_at, approved_at, revoked_at
                     FROM tool_manifest
                     WHERE name = :name
@@ -200,10 +212,14 @@ class ToolRepository:
                 openapi_spec=row[7],
                 capabilities=row[8] or [],
                 parameters_schema=row[9] or {},
-                created_at=row[10],
-                updated_at=row[11],
-                approved_at=row[12],
-                revoked_at=row[13],
+                execution_type=row[10],
+                docker_image=row[11],
+                docker_entrypoint=row[12],
+                execution_timeout=row[13],
+                created_at=row[14],
+                updated_at=row[15],
+                approved_at=row[16],
+                revoked_at=row[17],
             )
 
     async def list_tool_manifests(
@@ -226,6 +242,7 @@ class ToolRepository:
                     text("""
                         SELECT id, name, version, description, source_type, source_location,
                                status, openapi_spec, capabilities, parameters_schema,
+                               execution_type, docker_image, docker_entrypoint, execution_timeout,
                                created_at, updated_at, approved_at, revoked_at
                         FROM tool_manifest
                         WHERE status = :status
@@ -239,6 +256,7 @@ class ToolRepository:
                     text("""
                         SELECT id, name, version, description, source_type, source_location,
                                status, openapi_spec, capabilities, parameters_schema,
+                               execution_type, docker_image, docker_entrypoint, execution_timeout,
                                created_at, updated_at, approved_at, revoked_at
                         FROM tool_manifest
                         ORDER BY created_at DESC
@@ -261,10 +279,14 @@ class ToolRepository:
                         openapi_spec=row[7],
                         capabilities=row[8] or [],
                         parameters_schema=row[9] or {},
-                        created_at=row[10],
-                        updated_at=row[11],
-                        approved_at=row[12],
-                        revoked_at=row[13],
+                        execution_type=row[10],
+                        docker_image=row[11],
+                        docker_entrypoint=row[12],
+                        execution_timeout=row[13],
+                        created_at=row[14],
+                        updated_at=row[15],
+                        approved_at=row[16],
+                        revoked_at=row[17],
                     )
                 )
 
@@ -300,6 +322,14 @@ class ToolRepository:
             updates["capabilities"] = update.capabilities
         if update.parameters_schema is not None:
             updates["parameters_schema"] = update.parameters_schema
+        if update.execution_type is not None:
+            updates["execution_type"] = update.execution_type
+        if update.docker_image is not None:
+            updates["docker_image"] = update.docker_image
+        if update.docker_entrypoint is not None:
+            updates["docker_entrypoint"] = update.docker_entrypoint
+        if update.execution_timeout is not None:
+            updates["execution_timeout"] = update.execution_timeout
 
         if not updates:
             return await self.get_tool_manifest(tool_id)

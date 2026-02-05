@@ -83,6 +83,11 @@ class ToolManifestDB(BaseModel):
     openapi_spec: dict[str, Any] | None = None
     capabilities: list[dict[str, Any]] = Field(default_factory=list)
     parameters_schema: dict[str, Any] = Field(default_factory=dict)
+    # Execution configuration
+    execution_type: str | None = Field(default="docker", description="Execution type: docker or wasm")
+    docker_image: str | None = Field(default=None, description="Docker image name for execution")
+    docker_entrypoint: str | None = Field(default=None, description="Docker entrypoint command")
+    execution_timeout: int | None = Field(default=30, description="Execution timeout in seconds")
     created_at: datetime
     updated_at: datetime
     approved_at: datetime | None = None
@@ -103,6 +108,11 @@ class ToolManifestCreate(BaseModel):
     openapi_spec: dict[str, Any] | None = None
     capabilities: list[dict[str, Any]] = Field(default_factory=list)
     parameters_schema: dict[str, Any] = Field(default_factory=dict)
+    # Execution configuration
+    execution_type: str | None = Field(default="docker", description="Execution type: docker or wasm")
+    docker_image: str | None = Field(default=None, description="Docker image name for execution")
+    docker_entrypoint: str | None = Field(default=None, description="Docker entrypoint command")
+    execution_timeout: int | None = Field(default=30, description="Execution timeout in seconds")
 
 
 class ToolManifestUpdate(BaseModel):
@@ -114,6 +124,11 @@ class ToolManifestUpdate(BaseModel):
     openapi_spec: dict[str, Any] | None = None
     capabilities: list[dict[str, Any]] | None = None
     parameters_schema: dict[str, Any] | None = None
+    # Execution configuration
+    execution_type: str | None = None
+    docker_image: str | None = None
+    docker_entrypoint: str | None = None
+    execution_timeout: int | None = None
 
 
 # =============================================================================

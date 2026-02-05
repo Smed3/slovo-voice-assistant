@@ -23,6 +23,12 @@ CREATE TABLE tool_manifest (
     capabilities JSONB DEFAULT '[]'::jsonb,
     parameters_schema JSONB DEFAULT '{}'::jsonb,
     
+    -- Execution configuration
+    execution_type TEXT DEFAULT 'docker',
+    docker_image TEXT,
+    docker_entrypoint TEXT,
+    execution_timeout INTEGER DEFAULT 30,
+    
     -- Timestamps
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
