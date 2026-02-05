@@ -62,7 +62,7 @@ async def test_conversation_endpoint_simple():
     await redis.rpush(turn_key, json.dumps(turn2))
     await redis.rpush(turn_key, json.dumps(turn3))
     await redis.rpush(turn_key, json.dumps(turn4))
-    await redis.expire(turn_key, 7200)  # 2 hour TTL
+    await redis.expire(turn_key, 7200)  # 7200 seconds (2 hours) TTL
     
     print("✅ Added 4 turns to Redis")
     

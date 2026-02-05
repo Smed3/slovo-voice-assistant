@@ -128,7 +128,7 @@ async def get_conversation(conversation_id: str) -> ConversationHistoryResponse:
                 role=turn.role,
                 content=turn.content,
                 timestamp=turn.timestamp.isoformat() if turn.timestamp else None,
-                reasoning=None,  # Reasoning is not stored in turns
+                reasoning=None,  # TODO: Add reasoning support when implemented in ConversationTurn
             )
             for turn in turns
         ]
