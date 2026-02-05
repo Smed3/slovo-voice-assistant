@@ -72,7 +72,7 @@ class AgentOrchestrator:
         # Initialize agents with LLM provider
         self.intent_agent = IntentInterpreterAgent(self.llm)
         self.planner_agent = PlannerAgent(self.llm)
-        self.executor_agent = ExecutorAgent(self.llm)
+        self.executor_agent = ExecutorAgent(self.llm, memory_manager=memory_manager)
         self.verifier_agent = VerifierAgent(self.llm)
         self.explainer_agent = ExplainerAgent(self.llm)
 
@@ -92,7 +92,9 @@ class AgentOrchestrator:
     def set_memory_manager(self, manager: "MemoryManager") -> None:
         """Set memory manager for long-term memory support."""
         self._memory = manager
-        logger.info("Memory manager set for orchestrator")
+        # Also update executor agent with memory manager
+        self.executor_agent.set_memory_manager(manager)
+        logger.info("Memory manager set for orchestrator and executor")
 
     def _init_llm_provider(self) -> None:
         """Initialize LLM provider if not provided."""
