@@ -99,6 +99,43 @@ from slovo_agent.models.memory import (
     MemoryResetResponse,
 )
 
+from slovo_agent.models.tools import (
+    # Enums
+    ToolStatus,
+    ToolSourceType,
+    PermissionType,
+    ExecutionStatus,
+    DiscoveryStatus,
+    # Manifest models
+    ToolCapability,
+    ToolManifestDB,
+    ToolManifestCreate,
+    ToolManifestUpdate,
+    # Permission models
+    ToolPermissionDB,
+    ToolPermissionCreate,
+    ToolPermissionSet,
+    # Execution models
+    ToolExecutionLogDB,
+    ToolExecutionCreate,
+    ToolExecutionUpdate,
+    # State models
+    ToolStateDB,
+    ToolStateCreate,
+    ToolStateUpdate,
+    # Volume models
+    ToolVolumeDB,
+    ToolVolumeCreate,
+    # Discovery models
+    ToolDiscoveryQueueDB,
+    ToolDiscoveryRequest,
+    ToolDiscoveryUpdate,
+    # API response models
+    ToolInfo,
+    ToolDetail,
+    ToolExecutionResult,
+)
+
 __all__ = [
     # Intent models
     "IntentType",
@@ -185,4 +222,38 @@ __all__ = [
     "MemoryDeleteRequest",
     "MemoryResetRequest",
     "MemoryResetResponse",
+    # Tool models - Enums
+    "ToolStatus",
+    "ToolSourceType",
+    "PermissionType",
+    "ExecutionStatus",
+    "DiscoveryStatus",
+    # Tool models - Manifest
+    "ToolCapability",
+    "ToolManifestDB",
+    "ToolManifestCreate",
+    "ToolManifestUpdate",
+    # Tool models - Permission
+    "ToolPermissionDB",
+    "ToolPermissionCreate",
+    "ToolPermissionSet",
+    # Tool models - Execution
+    "ToolExecutionLogDB",
+    "ToolExecutionCreate",
+    "ToolExecutionUpdate",
+    # Tool models - State
+    "ToolStateDB",
+    "ToolStateCreate",
+    "ToolStateUpdate",
+    # Tool models - Volume
+    "ToolVolumeDB",
+    "ToolVolumeCreate",
+    # Tool models - Discovery
+    "ToolDiscoveryQueueDB",
+    "ToolDiscoveryRequest",
+    "ToolDiscoveryUpdate",
+    # Tool models - API response
+    "ToolInfo",
+    "ToolDetail",
+    "ToolExecutionResult",
 ]

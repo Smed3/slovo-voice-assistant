@@ -1,0 +1,84 @@
+name: example-weather
+version: "1.0.0"
+description: >
+  Example weather API integration that fetches current weather data.
+  This is a demonstration tool showing how to integrate external APIs.
+  Requires internet access permission.
+
+capabilities:
+  - name: get_current_weather
+    description: Get current weather for a location
+    endpoint: /weather/current
+    method: GET
+    parameters:
+      type: object
+      required: [location]
+      properties:
+        location:
+          type: string
+          description: City name or coordinates (e.g., "London" or "51.5074,-0.1278")
+        units:
+          type: string
+          enum: [metric, imperial]
+          default: metric
+          description: Temperature units
+
+  - name: get_forecast
+    description: Get weather forecast for next 5 days
+    endpoint: /weather/forecast
+    method: GET
+    parameters:
+      type: object
+      required: [location]
+      properties:
+        location:
+          type: string
+          description: City name or coordinates
+        days:
+          type: integer
+          minimum: 1
+          maximum: 5
+          default: 3
+          description: Number of days to forecast
+        units:
+          type: string
+          enum: [metric, imperial]
+          default: metric
+          description: Temperature units
+
+parameters_schema:
+  type: object
+  required: [action, location]
+  properties:
+    action:
+      type: string
+      enum: [get_current_weather, get_forecast]
+      description: The weather action to perform
+    location:
+      type: string
+      description: Location for weather data
+    units:
+      type: string
+      enum: [metric, imperial]
+      default: metric
+      description: Temperature units
+    days:
+      type: integer
+      minimum: 1
+      maximum: 5
+      default: 3
+      description: Number of forecast days (for forecast action)
+
+# This tool requires internet access
+permissions:
+  internet_access: true
+  storage_quota_mb: 50
+  cpu_limit_percent: 30
+  memory_limit_mb: 256
+
+# Note: In production, this would connect to a real weather API
+# For MVP, this serves as a template showing how external APIs integrate
+api_requirements:
+  base_url: https://api.weather-service.example.com
+  auth_type: api_key
+  auth_header: X-API-Key
