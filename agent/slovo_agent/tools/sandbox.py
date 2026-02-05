@@ -236,16 +236,39 @@ class DockerSandboxManager:
         # This prevents injection attacks via command string manipulation
         params_json = json.dumps(input_params)
 
+        # Use actual tool command from manifest if available
+        # Otherwise fall back to placeholder for testing
+        if tool_manifest.docker_image and tool_manifest.docker_entrypoint:
+            # Use configured image and entrypoint from manifest
+            image = tool_manifest.docker_image
+            # Parse entrypoint - it can be a string like "python /app/main.py"
+            # or a list of command parts
+            if isinstance(tool_manifest.docker_entrypoint, str):
+                command = tool_manifest.docker_entrypoint.split()
+            else:
+                command = tool_manifest.docker_entrypoint
+        else:
+            # Placeholder for tools without execution config (for testing)
+            # This echoes back the input parameters as JSON
+            logger.warning(
+                "Tool manifest missing execution config, using placeholder",
+                tool_name=tool_manifest.name,
+            )
+            image = "python:3.11-slim"
+            command = [
+                "python",
+                "-c",
+                (
+                    "import os; import json; "
+                    "params = json.loads(os.environ.get('TOOL_PARAMS', '{}')); "
+                    "print(json.dumps(params))"
+                ),
+            ]
+
         # Build container config
-        # TODO: Use actual tool command from manifest instead of placeholder
-        # The manifest should include:
-        # - Docker image name (tool_manifest.image)
-        # - Entry point script or executable (tool_manifest.entrypoint)
-        # - Command template with parameter placeholders
-        # For MVP, we use a placeholder that echoes parameters for testing
         config = {
-            "image": "python:3.11-slim",
-            "command": ["python", "-c", "import os; import json; params = json.loads(os.environ.get('TOOL_PARAMS', '{}')); print(json.dumps(params))"],
+            "image": image,
+            "command": command,
             "environment": {
                 "TOOL_PARAMS": params_json,
             },

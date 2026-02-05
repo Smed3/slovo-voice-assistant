@@ -142,6 +142,13 @@ class ToolDiscoveryAgent:
             if field not in manifest_data:
                 raise ValueError(f"Missing required field in manifest: {field}")
 
+        # Extract execution configuration
+        execution = manifest_data.get("execution", {})
+        execution_type = execution.get("type", "docker")
+        docker_image = execution.get("image")
+        docker_entrypoint = execution.get("entrypoint")
+        execution_timeout = execution.get("timeout", 30)
+
         # Create tool manifest
         manifest = ToolManifestCreate(
             name=manifest_data["name"],
@@ -151,6 +158,10 @@ class ToolDiscoveryAgent:
             source_location=str(path.absolute()),
             capabilities=manifest_data.get("capabilities", []),
             parameters_schema=manifest_data.get("parameters_schema", {}),
+            execution_type=execution_type,
+            docker_image=docker_image,
+            docker_entrypoint=docker_entrypoint,
+            execution_timeout=execution_timeout,
         )
 
         # Save to repository
