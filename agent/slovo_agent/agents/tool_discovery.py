@@ -78,6 +78,7 @@ class ToolDiscoveryAgent:
         self,
         tool_repository: ToolRepository,
         llm_provider: LLMProvider | None = None,
+        openapi_analysis_prompt: str | None = None,
     ) -> None:
         """
         Initialize Tool Discovery Agent.
@@ -85,13 +86,16 @@ class ToolDiscoveryAgent:
         Args:
             tool_repository: Repository for tool persistence
             llm_provider: Optional LLM provider for API analysis
+            openapi_analysis_prompt: Optional custom prompt for OpenAPI analysis
         """
         self.tool_repo = tool_repository
         self.llm = llm_provider
+        self.openapi_analysis_prompt = openapi_analysis_prompt or OPENAPI_ANALYSIS_PROMPT
         self.http_client = httpx.AsyncClient(timeout=30.0)
         logger.info(
             "Tool Discovery Agent initialized",
             has_llm=llm_provider is not None,
+            has_custom_prompt=openapi_analysis_prompt is not None,
         )
 
     def set_llm_provider(self, provider: LLMProvider) -> None:
@@ -317,7 +321,7 @@ Return a JSON object with the structure specified in your instructions.""",
 
             response = await self.llm.generate(
                 messages=messages,
-                system_prompt=OPENAPI_ANALYSIS_PROMPT,
+                system_prompt=self.openapi_analysis_prompt,
             )
 
             # Try to parse JSON from response

@@ -237,8 +237,12 @@ class DockerSandboxManager:
         params_json = json.dumps(input_params)
 
         # Build container config
-        # Note: Actual image name should come from tool manifest
-        # For MVP, we'll use a generic Python base image
+        # TODO: Use actual tool command from manifest instead of placeholder
+        # The manifest should include:
+        # - Docker image name (tool_manifest.image)
+        # - Entry point script or executable (tool_manifest.entrypoint)
+        # - Command template with parameter placeholders
+        # For MVP, we use a placeholder that echoes parameters for testing
         config = {
             "image": "python:3.11-slim",
             "command": ["python", "-c", "import os; import json; params = json.loads(os.environ.get('TOOL_PARAMS', '{}')); print(json.dumps(params))"],

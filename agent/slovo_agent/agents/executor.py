@@ -18,6 +18,7 @@ from slovo_agent.models import (
     PlanStep,
     StepResult,
     StepType,
+    ToolDiscoveryRequest,
 )
 
 logger = structlog.get_logger(__name__)
@@ -329,8 +330,6 @@ class ExecutorAgent:
                 )
             
             # Create discovery request
-            from slovo_agent.models import ToolDiscoveryRequest
-
             discovery_request = ToolDiscoveryRequest(
                 capability_description=intent,
                 requested_by="executor",
