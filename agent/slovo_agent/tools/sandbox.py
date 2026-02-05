@@ -258,7 +258,11 @@ class DockerSandboxManager:
             command = [
                 "python",
                 "-c",
-                "import os; import json; params = json.loads(os.environ.get('TOOL_PARAMS', '{}')); print(json.dumps(params))",
+                (
+                    "import os; import json; "
+                    "params = json.loads(os.environ.get('TOOL_PARAMS', '{}')); "
+                    "print(json.dumps(params))"
+                ),
             ]
 
         # Build container config

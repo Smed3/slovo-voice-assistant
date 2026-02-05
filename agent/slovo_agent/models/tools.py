@@ -84,10 +84,18 @@ class ToolManifestDB(BaseModel):
     capabilities: list[dict[str, Any]] = Field(default_factory=list)
     parameters_schema: dict[str, Any] = Field(default_factory=dict)
     # Execution configuration
-    execution_type: str | None = Field(default="docker", description="Execution type: docker or wasm")
-    docker_image: str | None = Field(default=None, description="Docker image name for execution")
-    docker_entrypoint: str | None = Field(default=None, description="Docker entrypoint command")
-    execution_timeout: int | None = Field(default=30, description="Execution timeout in seconds")
+    execution_type: str | None = Field(
+        default="docker", description="Execution type: docker or wasm"
+    )
+    docker_image: str | None = Field(
+        default=None, description="Docker image name for execution"
+    )
+    docker_entrypoint: str | None = Field(
+        default=None, description="Docker entrypoint command"
+    )
+    execution_timeout: int | None = Field(
+        default=30, description="Execution timeout in seconds"
+    )
     created_at: datetime
     updated_at: datetime
     approved_at: datetime | None = None
@@ -109,10 +117,18 @@ class ToolManifestCreate(BaseModel):
     capabilities: list[dict[str, Any]] = Field(default_factory=list)
     parameters_schema: dict[str, Any] = Field(default_factory=dict)
     # Execution configuration
-    execution_type: str | None = Field(default="docker", description="Execution type: docker or wasm")
-    docker_image: str | None = Field(default=None, description="Docker image name for execution")
-    docker_entrypoint: str | None = Field(default=None, description="Docker entrypoint command")
-    execution_timeout: int | None = Field(default=30, description="Execution timeout in seconds")
+    execution_type: str | None = Field(
+        default="docker", description="Execution type: docker or wasm"
+    )
+    docker_image: str | None = Field(
+        default=None, description="Docker image name for execution"
+    )
+    docker_entrypoint: str | None = Field(
+        default=None, description="Docker entrypoint command"
+    )
+    execution_timeout: int | None = Field(
+        default=30, description="Execution timeout in seconds"
+    )
 
 
 class ToolManifestUpdate(BaseModel):

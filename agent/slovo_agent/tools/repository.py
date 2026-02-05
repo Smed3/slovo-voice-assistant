@@ -9,6 +9,7 @@ Phase 4: Autonomous tool lifecycle management
 """
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID, uuid4
 
 import structlog
@@ -31,9 +32,7 @@ from slovo_agent.models import (
     ToolPermissionCreate,
     ToolPermissionDB,
     ToolSourceType,
-    ToolStateCreate,
     ToolStateDB,
-    ToolStateUpdate,
     ToolStatus,
     ToolVolumeCreate,
     ToolVolumeDB,
