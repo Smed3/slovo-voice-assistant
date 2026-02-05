@@ -90,8 +90,8 @@ class ToolManifestDB(BaseModel):
     docker_image: str | None = Field(
         default=None, description="Docker image name for execution"
     )
-    docker_entrypoint: str | None = Field(
-        default=None, description="Docker entrypoint command"
+    docker_entrypoint: str | list[str] | None = Field(
+        default=None, description="Docker entrypoint command (string or list)"
     )
     execution_timeout: int | None = Field(
         default=30, description="Execution timeout in seconds"
@@ -123,8 +123,8 @@ class ToolManifestCreate(BaseModel):
     docker_image: str | None = Field(
         default=None, description="Docker image name for execution"
     )
-    docker_entrypoint: str | None = Field(
-        default=None, description="Docker entrypoint command"
+    docker_entrypoint: str | list[str] | None = Field(
+        default=None, description="Docker entrypoint command (string or list)"
     )
     execution_timeout: int | None = Field(
         default=30, description="Execution timeout in seconds"
@@ -143,7 +143,7 @@ class ToolManifestUpdate(BaseModel):
     # Execution configuration
     execution_type: str | None = None
     docker_image: str | None = None
-    docker_entrypoint: str | None = None
+    docker_entrypoint: str | list[str] | None = None
     execution_timeout: int | None = None
 
 
