@@ -628,7 +628,7 @@ class ToolRepository:
             List of execution logs
         """
         conditions = []
-        params: dict[str, any] = {"limit": limit}
+        params: dict[str, Any] = {"limit": limit}
 
         if tool_id:
             conditions.append("tool_id = :tool_id")
