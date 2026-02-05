@@ -3,7 +3,8 @@ Chat API endpoints.
 """
 
 import uuid
-from typing import TYPE_CHECKING, AsyncGenerator, Optional
+from collections.abc import AsyncGenerator
+from typing import TYPE_CHECKING
 
 import structlog
 from fastapi import APIRouter
@@ -23,8 +24,8 @@ logger = structlog.get_logger(__name__)
 router = APIRouter()
 
 # Global orchestrator instance (will be properly initialized in lifespan)
-_orchestrator: Optional[AgentOrchestrator] = None
-_memory_manager: "Optional[MemoryManager]" = None
+_orchestrator: AgentOrchestrator | None = None
+_memory_manager: "MemoryManager | None" = None
 
 
 def set_chat_memory_manager(manager: "MemoryManager") -> None:
@@ -50,21 +51,21 @@ async def chat(request: ChatRequest) -> ChatResponse:
     Send a chat message and receive a response.
     """
     logger.info("Chat request received", message_length=len(request.message))
-    
+
     # Generate conversation ID if not provided
     conversation_id = request.conversation_id or str(uuid.uuid4())
-    
+
     # Get orchestrator and process message
     orchestrator = get_orchestrator()
     result = await orchestrator.process_message(
         message=request.message,
         conversation_id=conversation_id,
     )
-    
+
     response_id = str(uuid.uuid4())
-    
+
     logger.info("Chat response generated", response_id=response_id)
-    
+
     return ChatResponse(
         id=response_id,
         response=result.response,
@@ -79,10 +80,10 @@ async def chat_stream(request: ChatRequest) -> StreamingResponse:
     Stream a chat response for long-running queries.
     """
     logger.info("Chat stream request received", message_length=len(request.message))
-    
+
     # Generate conversation ID if not provided
     conversation_id = request.conversation_id or str(uuid.uuid4())
-    
+
     async def generate() -> AsyncGenerator[str, None]:
         orchestrator = get_orchestrator()
         async for chunk in orchestrator.process_message_stream(
@@ -90,7 +91,7 @@ async def chat_stream(request: ChatRequest) -> StreamingResponse:
             conversation_id=conversation_id,
         ):
             yield chunk
-    
+
     return StreamingResponse(
         generate(),
         media_type="text/event-stream",
@@ -103,9 +104,54 @@ async def get_conversation(conversation_id: str) -> ConversationHistoryResponse:
     Get conversation history by ID.
     """
     logger.info("Fetching conversation", conversation_id=conversation_id)
-    
-    # TODO: Implement actual conversation retrieval from memory
-    return ConversationHistoryResponse(
-        conversation_id=conversation_id,
-        messages=[],
-    )
+
+    # Check if memory manager is available
+    if _memory_manager is None:
+        logger.warning("Memory manager not available", conversation_id=conversation_id)
+        return ConversationHistoryResponse(
+            conversation_id=conversation_id,
+            messages=[],
+        )
+
+    try:
+        # Access Redis repository directly to get full ConversationTurn objects
+        # This gives us access to timestamps and IDs
+        turns = await _memory_manager._redis.get_recent_turns(
+            conversation_id=conversation_id,
+            limit=100,  # Get up to 100 recent messages
+        )
+
+        # Convert ConversationTurn objects to ConversationMessage format
+        from slovo_agent.models import ConversationMessage
+        messages = [
+            ConversationMessage(
+                id=str(turn.id),
+                role=turn.role,
+                content=turn.content,
+                timestamp=turn.timestamp.isoformat() if turn.timestamp else None,
+                reasoning=None,  # Reasoning is not stored in turns
+            )
+            for turn in turns
+        ]
+
+        logger.info(
+            "Conversation retrieved",
+            conversation_id=conversation_id,
+            message_count=len(messages),
+        )
+
+        return ConversationHistoryResponse(
+            conversation_id=conversation_id,
+            messages=messages,
+        )
+    except Exception as e:
+        logger.error(
+            "Failed to retrieve conversation",
+            conversation_id=conversation_id,
+            error=str(e),
+        )
+        # Return empty messages on error to avoid breaking the API
+        return ConversationHistoryResponse(
+            conversation_id=conversation_id,
+            messages=[],
+        )
