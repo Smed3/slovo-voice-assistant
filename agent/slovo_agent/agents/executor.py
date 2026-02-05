@@ -15,7 +15,6 @@ from slovo_agent.models import (
     ExecutionPlan,
     ExecutionResult,
     MemoryContext,
-    MemoryRetrievalRequest,
     PlanStep,
     StepResult,
     StepType,
