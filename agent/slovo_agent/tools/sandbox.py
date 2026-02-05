@@ -5,6 +5,7 @@ Phase 4: Manages Docker containers for isolated tool execution with
 strict permission enforcement and resource limits.
 """
 
+import json
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -231,8 +232,8 @@ class DockerSandboxManager:
         # Tool volume for state persistence
         volumes = await self._get_or_create_volume(tool_manifest.id)
 
-        # Safely serialize input parameters
-        import json
+        # Safely pass input parameters via environment variable
+        # This prevents injection attacks via command string manipulation
         params_json = json.dumps(input_params)
 
         # Build container config
@@ -240,7 +241,10 @@ class DockerSandboxManager:
         # For MVP, we'll use a generic Python base image
         config = {
             "image": "python:3.11-slim",
-            "command": ["python", "-c", f"import json; params = json.loads('''{params_json}'''); print(json.dumps(params))"],
+            "command": ["python", "-c", "import os; import json; params = json.loads(os.environ.get('TOOL_PARAMS', '{}')); print(json.dumps(params))"],
+            "environment": {
+                "TOOL_PARAMS": params_json,
+            },
             "network_mode": network_mode,
             "cpu_quota": cpu_quota,
             "cpu_period": cpu_period,

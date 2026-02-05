@@ -317,7 +317,16 @@ class ExecutorAgent:
 
         try:
             # Extract capability description from context
-            intent = context.get("intent", "")
+            intent = context.get("intent", "").strip()
+            
+            # Validate intent is not empty
+            if not intent:
+                logger.warning("Empty intent for tool discovery")
+                return StepResult(
+                    step_index=index,
+                    success=False,
+                    error="Cannot discover tool: no capability description provided",
+                )
             
             # Create discovery request
             from slovo_agent.models import ToolDiscoveryRequest
