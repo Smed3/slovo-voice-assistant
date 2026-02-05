@@ -225,11 +225,11 @@ class ExecutorAgent:
             )
         
         try:
-            # Extract user message from context
-            intent = context.get("intent", "")
+            # Extract user message from context for memory search
+            user_message = context.get("intent", "")
             conversation_id = context.get("conversation_id")
             
-            if not intent:
+            if not user_message:
                 logger.warning("No intent available for memory retrieval")
                 return StepResult(
                     step_index=index,
@@ -242,7 +242,7 @@ class ExecutorAgent:
             
             # Retrieve memory context using the memory manager
             memory_context = await self.memory_manager.retrieve_context(
-                user_message=intent,
+                user_message=user_message,
                 conversation_id=conversation_id,
                 token_limit=1500,  # Smaller limit for step-based retrieval
             )
@@ -272,10 +272,10 @@ class ExecutorAgent:
                 success=True,
                 output={
                     "memories": [
-                        memory_context.user_profile_summary,
-                        memory_context.relevant_memories_summary,
-                        memory_context.recent_conversation_summary,
-                        memory_context.episodic_context_summary,
+                        memory_context.user_profile_summary or "",
+                        memory_context.relevant_memories_summary or "",
+                        memory_context.recent_conversation_summary or "",
+                        memory_context.episodic_context_summary or "",
                     ],
                     "relevant_context": relevant_context,
                     "memory_context": memory_context,
