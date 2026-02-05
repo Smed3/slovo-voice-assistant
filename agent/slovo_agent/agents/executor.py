@@ -6,7 +6,7 @@ Uses LLM for response generation with structured outputs.
 Phase 4: Integration with Docker sandbox and Tool Discovery Agent.
 """
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -15,11 +15,15 @@ from slovo_agent.models import (
     ExecutionPlan,
     ExecutionResult,
     MemoryContext,
+    MemoryRetrievalRequest,
     PlanStep,
     StepResult,
     StepType,
     ToolDiscoveryRequest,
 )
+
+if TYPE_CHECKING:
+    from slovo_agent.memory import MemoryManager
 
 logger = structlog.get_logger(__name__)
 
@@ -56,16 +60,19 @@ class ExecutorAgent:
         llm_provider: LLMProvider | None = None,
         sandbox_manager: Any | None = None,
         tool_discovery_agent: Any | None = None,
+        memory_manager: "MemoryManager | None" = None,
     ) -> None:
         self.llm = llm_provider
         self.sandbox_manager = sandbox_manager
         self.tool_discovery_agent = tool_discovery_agent
+        self.memory_manager = memory_manager
         self.max_retries = 2
         logger.info(
             "Executor agent initialized",
             has_llm=llm_provider is not None,
             has_sandbox=sandbox_manager is not None,
             has_discovery=tool_discovery_agent is not None,
+            has_memory=memory_manager is not None,
         )
 
     def set_llm_provider(self, provider: LLMProvider) -> None:
@@ -82,6 +89,11 @@ class ExecutorAgent:
         """Set or update the tool discovery agent."""
         self.tool_discovery_agent = agent
         logger.info("Tool discovery agent updated for executor")
+
+    def set_memory_manager(self, manager: "MemoryManager") -> None:
+        """Set or update the memory manager."""
+        self.memory_manager = manager
+        logger.info("Memory manager updated for executor")
 
     async def execute(
         self,
@@ -192,20 +204,92 @@ class ExecutorAgent:
         index: int,
         context: dict[str, Any],
     ) -> StepResult:
-        """Execute memory retrieval step."""
-        # TODO: Implement actual memory retrieval from Qdrant/Redis
+        """
+        Execute memory retrieval step.
+        
+        This retrieves additional memory context during execution,
+        beyond what was pre-retrieved by the orchestrator.
+        Useful for step-based memory queries requested by the planner.
+        """
         logger.debug("Retrieving memories for context")
-
-        # For now, return empty memories
-        # In Phase 3, this will query the memory subsystem
-        return StepResult(
-            step_index=index,
-            success=True,
-            output={
-                "memories": [],
-                "relevant_context": "",
-            },
-        )
+        
+        # Check if memory manager is available
+        if not self.memory_manager:
+            logger.warning("No memory manager available for memory retrieval step")
+            return StepResult(
+                step_index=index,
+                success=True,
+                output={
+                    "memories": [],
+                    "relevant_context": "Memory system not configured",
+                },
+            )
+        
+        try:
+            # Extract user message from context
+            intent = context.get("intent", "")
+            conversation_id = context.get("conversation_id")
+            
+            if not intent:
+                logger.warning("No intent available for memory retrieval")
+                return StepResult(
+                    step_index=index,
+                    success=True,
+                    output={
+                        "memories": [],
+                        "relevant_context": "",
+                    },
+                )
+            
+            # Retrieve memory context using the memory manager
+            memory_context = await self.memory_manager.retrieve_context(
+                user_message=intent,
+                conversation_id=conversation_id,
+                token_limit=1500,  # Smaller limit for step-based retrieval
+            )
+            
+            # Build a relevant context string from retrieved memories
+            context_parts = []
+            if memory_context.user_profile_summary:
+                context_parts.append(f"Profile: {memory_context.user_profile_summary}")
+            if memory_context.relevant_memories_summary:
+                context_parts.append(f"Memories: {memory_context.relevant_memories_summary}")
+            if memory_context.recent_conversation_summary:
+                context_parts.append(f"Recent: {memory_context.recent_conversation_summary}")
+            if memory_context.episodic_context_summary:
+                context_parts.append(f"Past actions: {memory_context.episodic_context_summary}")
+            
+            relevant_context = " | ".join(context_parts)
+            
+            logger.debug(
+                "Memory retrieval completed",
+                token_estimate=memory_context.total_token_estimate,
+                has_profile=bool(memory_context.user_profile_summary),
+                has_semantic=bool(memory_context.relevant_memories_summary),
+            )
+            
+            return StepResult(
+                step_index=index,
+                success=True,
+                output={
+                    "memories": [
+                        memory_context.user_profile_summary,
+                        memory_context.relevant_memories_summary,
+                        memory_context.recent_conversation_summary,
+                        memory_context.episodic_context_summary,
+                    ],
+                    "relevant_context": relevant_context,
+                    "memory_context": memory_context,
+                },
+            )
+            
+        except Exception as e:
+            logger.error("Memory retrieval failed", error=str(e))
+            return StepResult(
+                step_index=index,
+                success=False,
+                error=f"Memory retrieval failed: {str(e)}",
+            )
 
     async def _execute_tool(
         self,
