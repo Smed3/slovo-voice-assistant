@@ -7,6 +7,7 @@ from slovo_agent.agents.explainer import ExplainerAgent
 from slovo_agent.agents.intent import IntentInterpreterAgent
 from slovo_agent.agents.orchestrator import AgentOrchestrator
 from slovo_agent.agents.planner import PlannerAgent
+from slovo_agent.agents.tool_discovery import ToolDiscoveryAgent
 from slovo_agent.agents.verifier import VerifierAgent
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "ExplainerAgent",
     "IntentInterpreterAgent",
     "PlannerAgent",
+    "ToolDiscoveryAgent",
     "VerifierAgent",
 ]
