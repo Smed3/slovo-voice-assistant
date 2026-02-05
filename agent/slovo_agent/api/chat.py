@@ -114,9 +114,8 @@ async def get_conversation(conversation_id: str) -> ConversationHistoryResponse:
         )
 
     try:
-        # Access Redis repository directly to get full ConversationTurn objects
-        # This gives us access to timestamps and IDs
-        turns = await _memory_manager._redis.get_recent_turns(
+        # Get full conversation turns from memory manager
+        turns = await _memory_manager.get_conversation_turns(
             conversation_id=conversation_id,
             limit=100,  # Get up to 100 recent messages
         )

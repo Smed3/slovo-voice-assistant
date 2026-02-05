@@ -7,7 +7,6 @@ Phase 3: Central memory management service
 - Provides unified interface for agents and API
 """
 
-from typing import Final
 from uuid import UUID
 
 import structlog
@@ -26,21 +25,19 @@ from slovo_agent.memory.redis_repository import RedisRepository
 from slovo_agent.memory.retrieval import EmbeddingFunction, MemoryRetrievalPipeline
 from slovo_agent.memory.writer import MemoryWriteService
 from slovo_agent.models import (
+    ConversationTurn,
     MemoryContext,
     MemoryDetailResponse,
     MemoryListItem,
     MemoryListRequest,
     MemoryListResponse,
-    MemoryMetadata,
-    MemoryRetrievalRequest,
     MemoryResetRequest,
     MemoryResetResponse,
-    MemorySource,
+    MemoryRetrievalRequest,
     MemoryType,
     MemoryUpdateRequest,
     MemoryWriteRequest,
     MemoryWriteResult,
-    SemanticSearchResult,
     StoreLocation,
     UserProfile,
     VerifierMemoryApproval,
@@ -143,8 +140,9 @@ class MemoryManager:
             content: Message content
         """
         from typing import Literal, cast
+
         from slovo_agent.models import ConversationTurn
-        
+
         # Cast to literal type (runtime validated by Pydantic)
         typed_role = cast(Literal["user", "assistant"], role)
         turn = ConversationTurn(role=typed_role, content=content)
@@ -176,6 +174,26 @@ class MemoryManager:
         """
         turns = await self._redis.get_recent_turns(conversation_id, limit)
         return [{"role": t.role, "content": t.content} for t in turns]
+
+    async def get_conversation_turns(
+        self,
+        conversation_id: str,
+        limit: int = 100,
+    ) -> list[ConversationTurn]:
+        """
+        Get full conversation turns from short-term memory.
+
+        This method returns complete ConversationTurn objects including
+        IDs, timestamps, and all metadata, suitable for API responses.
+
+        Args:
+            conversation_id: Conversation identifier
+            limit: Maximum turns to return (default: 100)
+
+        Returns:
+            List of ConversationTurn objects
+        """
+        return await self._redis.get_recent_turns(conversation_id, limit)
 
     # =========================================================================
     # Memory Writes (Requires Verifier Approval)
@@ -534,15 +552,15 @@ async def _create_openai_embedding_function() -> EmbeddingFunction | None:
     """Create an embedding function using OpenAI if available."""
     try:
         from slovo_agent.config import settings
-        
+
         if not settings.openai_api_key:
             logger.warning("No OpenAI API key - semantic memory disabled")
             return None
-        
-        from openai import AsyncOpenAI, APIConnectionError, APIError
-        
+
+        from openai import APIConnectionError, APIError, AsyncOpenAI
+
         client = AsyncOpenAI(api_key=settings.openai_api_key)
-        
+
         async def embed(text: str) -> list[float]:
             """Generate embedding for text using OpenAI."""
             try:
@@ -562,7 +580,7 @@ async def _create_openai_embedding_function() -> EmbeddingFunction | None:
             except APIError as e:
                 logger.warning("OpenAI API error", error=str(e))
                 raise
-        
+
         logger.info("OpenAI embedding function initialized")
         return embed
     except Exception as e:
@@ -619,10 +637,10 @@ async def create_memory_manager(
         postgres=postgres_repo,
         encryption=encryption,
     )
-    
+
     # Initialize embedding function for semantic memory
     embedding_fn = await _create_openai_embedding_function()
     if embedding_fn:
         manager.set_embedding_function(embedding_fn)
-    
+
     return manager
