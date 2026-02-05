@@ -3,6 +3,7 @@ Executor Agent
 
 Executes approved tools in sandboxed environments, handles retries and partial failures.
 Uses LLM for response generation with structured outputs.
+Phase 4: Integration with Docker sandbox and Tool Discovery Agent.
 """
 
 from typing import Any
@@ -17,6 +18,7 @@ from slovo_agent.models import (
     PlanStep,
     StepResult,
     StepType,
+    ToolDiscoveryRequest,
 )
 
 logger = structlog.get_logger(__name__)
@@ -46,20 +48,40 @@ class ExecutorAgent:
     - Handle retries and partial failures
     - Generate LLM responses using the provider
     - Aggregate results
+    - Integration with Docker sandbox and Tool Discovery Agent
     """
 
-    def __init__(self, llm_provider: LLMProvider | None = None) -> None:
+    def __init__(
+        self,
+        llm_provider: LLMProvider | None = None,
+        sandbox_manager: Any | None = None,
+        tool_discovery_agent: Any | None = None,
+    ) -> None:
         self.llm = llm_provider
+        self.sandbox_manager = sandbox_manager
+        self.tool_discovery_agent = tool_discovery_agent
         self.max_retries = 2
         logger.info(
             "Executor agent initialized",
             has_llm=llm_provider is not None,
+            has_sandbox=sandbox_manager is not None,
+            has_discovery=tool_discovery_agent is not None,
         )
 
     def set_llm_provider(self, provider: LLMProvider) -> None:
         """Set or update the LLM provider."""
         self.llm = provider
         logger.info("LLM provider updated for executor")
+
+    def set_sandbox_manager(self, manager: Any) -> None:
+        """Set or update the sandbox manager."""
+        self.sandbox_manager = manager
+        logger.info("Sandbox manager updated for executor")
+
+    def set_tool_discovery_agent(self, agent: Any) -> None:
+        """Set or update the tool discovery agent."""
+        self.tool_discovery_agent = agent
+        logger.info("Tool discovery agent updated for executor")
 
     async def execute(
         self,
@@ -192,20 +214,87 @@ class ExecutorAgent:
         context: dict[str, Any],
     ) -> StepResult:
         """Execute a tool in the sandbox."""
-        # TODO: Implement sandboxed tool execution via Docker
+        if not step.tool_name:
+            return StepResult(
+                step_index=index,
+                success=False,
+                error="No tool name specified",
+            )
+
         logger.debug("Executing tool", tool_name=step.tool_name)
 
-        # For now, return placeholder
-        # In Phase 4, this will execute in Docker sandbox
-        return StepResult(
-            step_index=index,
-            success=True,
-            output={
-                "tool_name": step.tool_name,
-                "result": "Tool execution not yet implemented",
-                "params": step.tool_params,
-            },
-        )
+        # Check if sandbox manager is available
+        if not self.sandbox_manager:
+            logger.warning("No sandbox manager available, tool execution skipped")
+            return StepResult(
+                step_index=index,
+                success=True,
+                output={
+                    "tool_name": step.tool_name,
+                    "result": "Tool execution not configured (sandbox manager missing)",
+                    "params": step.tool_params,
+                },
+            )
+
+        try:
+            # Get tool manifest from repository
+            tool_repo = self.sandbox_manager.tool_repo
+            tool_manifest = await tool_repo.get_tool_manifest_by_name(step.tool_name)
+
+            if not tool_manifest:
+                return StepResult(
+                    step_index=index,
+                    success=False,
+                    error=f"Tool not found: {step.tool_name}",
+                )
+
+            # Get tool permissions
+            permissions = await tool_repo.list_tool_permissions(tool_manifest.id)
+
+            # Get conversation context for tracking
+            conversation_id = context.get("conversation_id")
+            turn_id = context.get("turn_id")
+
+            # Execute tool in sandbox
+            result = await self.sandbox_manager.execute_tool(
+                tool_manifest=tool_manifest,
+                permissions=permissions,
+                input_params=step.tool_params,
+                conversation_id=conversation_id,
+                turn_id=turn_id,
+            )
+
+            # Check if execution succeeded
+            if result["status"] == "success":
+                return StepResult(
+                    step_index=index,
+                    success=True,
+                    output={
+                        "tool_name": step.tool_name,
+                        "result": result["output"],
+                        "execution_id": result["execution_id"],
+                        "duration_ms": result["duration_ms"],
+                    },
+                )
+            else:
+                return StepResult(
+                    step_index=index,
+                    success=False,
+                    error=result.get("error_message", "Tool execution failed"),
+                    output={
+                        "tool_name": step.tool_name,
+                        "execution_id": result["execution_id"],
+                        "exit_code": result.get("exit_code"),
+                    },
+                )
+
+        except Exception as e:
+            logger.error("Tool execution error", tool_name=step.tool_name, error=str(e))
+            return StepResult(
+                step_index=index,
+                success=False,
+                error=f"Tool execution failed: {str(e)}",
+            )
 
     async def _execute_tool_discovery(
         self,
@@ -213,19 +302,59 @@ class ExecutorAgent:
         context: dict[str, Any],
     ) -> StepResult:
         """Execute tool discovery step."""
-        # TODO: Implement tool discovery via API search
         logger.debug("Discovering tools for request")
 
-        # For now, return empty discovery
-        # In Phase 4, this will search for and propose tools
-        return StepResult(
-            step_index=index,
-            success=True,
-            output={
-                "discovered_tools": [],
-                "recommendation": "No tools discovered yet",
-            },
-        )
+        # Check if tool discovery agent is available
+        if not self.tool_discovery_agent:
+            logger.warning("No tool discovery agent available")
+            return StepResult(
+                step_index=index,
+                success=True,
+                output={
+                    "discovered_tools": [],
+                    "recommendation": "Tool discovery not configured",
+                },
+            )
+
+        try:
+            # Extract capability description from context
+            intent = context.get("intent", "").strip()
+            
+            # Validate intent is not empty
+            if not intent:
+                logger.warning("Empty intent for tool discovery")
+                return StepResult(
+                    step_index=index,
+                    success=False,
+                    error="Cannot discover tool: no capability description provided",
+                )
+            
+            # Create discovery request
+            discovery_request = ToolDiscoveryRequest(
+                capability_description=intent,
+                requested_by="executor",
+            )
+
+            # Queue discovery request
+            request_id = await self.tool_discovery_agent.discover_tool(discovery_request)
+
+            return StepResult(
+                step_index=index,
+                success=True,
+                output={
+                    "discovery_request_id": str(request_id),
+                    "status": "queued",
+                    "recommendation": "Tool discovery request queued. Manual approval required.",
+                },
+            )
+
+        except Exception as e:
+            logger.error("Tool discovery error", error=str(e))
+            return StepResult(
+                step_index=index,
+                success=False,
+                error=f"Tool discovery failed: {str(e)}",
+            )
 
     async def _execute_llm_response(
         self,

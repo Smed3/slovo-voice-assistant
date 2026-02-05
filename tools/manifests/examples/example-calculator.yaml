@@ -1,0 +1,81 @@
+name: example-calculator
+version: "1.0.0"
+description: >
+  A simple calculator tool that performs basic arithmetic operations.
+  This is an example tool for testing the autonomous tooling system.
+  Does not require internet access.
+
+capabilities:
+  - name: add
+    description: Add two numbers together
+    parameters:
+      type: object
+      required: [a, b]
+      properties:
+        a:
+          type: number
+          description: First number
+        b:
+          type: number
+          description: Second number
+
+  - name: subtract
+    description: Subtract second number from first
+    parameters:
+      type: object
+      required: [a, b]
+      properties:
+        a:
+          type: number
+          description: First number
+        b:
+          type: number
+          description: Second number to subtract
+
+  - name: multiply
+    description: Multiply two numbers
+    parameters:
+      type: object
+      required: [a, b]
+      properties:
+        a:
+          type: number
+          description: First number
+        b:
+          type: number
+          description: Second number
+
+  - name: divide
+    description: Divide first number by second
+    parameters:
+      type: object
+      required: [a, b]
+      properties:
+        a:
+          type: number
+          description: Numerator
+        b:
+          type: number
+          description: Denominator (cannot be zero)
+
+parameters_schema:
+  type: object
+  required: [operation, a, b]
+  properties:
+    operation:
+      type: string
+      enum: [add, subtract, multiply, divide]
+      description: The operation to perform
+    a:
+      type: number
+      description: First operand
+    b:
+      type: number
+      description: Second operand
+
+# This tool doesn't need internet access
+permissions:
+  internet_access: false
+  storage_quota_mb: 10
+  cpu_limit_percent: 25
+  memory_limit_mb: 128
